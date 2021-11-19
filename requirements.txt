@@ -1,0 +1,6 @@
+setuptools==59.1.1
+numpy~=1.21.4
+gym~=0.21.0
+pandas
+gurobipy~=9.5.0
+PyYAML~=6.0
