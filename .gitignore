@@ -190,3 +190,4 @@ fabric.properties
 #/data/delay_dict.pkl
 #/data/match_probability_2019.csv
 #/data/user_home_location.csv
+/logs/

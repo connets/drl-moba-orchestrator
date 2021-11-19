@@ -32,12 +32,6 @@ class MecMobaDQNEvn(gym.Env):
 
     def _initial_observation(self):
         return self._internal_env.get_time_slot_state().to_array()
-        # initial_qos = [0] * 6
-        # initial_facility_load = [0] * 10
-        # initial_queue_state = [0, 0, 0]  # q_occ, w_t and loss_rate
-        # initial_running_state = [0, 0]  # time running, % migrable
-        #
-        # return np.concatenate([initial_qos, initial_facility_load, initial_queue_state, initial_running_state])[np.newaxis, :]
 
     def step(self, action):
         # print(self._actions_dict[action])
@@ -56,7 +50,7 @@ class MecMobaDQNEvn(gym.Env):
         #
 
     def reset(self):
-        print('end week')
+        # print('end week')
         self._internal_env.reset()
         return self._initial_observation()
 

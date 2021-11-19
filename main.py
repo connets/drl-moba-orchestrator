@@ -5,7 +5,7 @@ import gym
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 from stable_baselines3 import DQN
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
 from mec_moba.envs import MecMobaDQNEvn
 
@@ -17,17 +17,20 @@ class MyCallBack(BaseCallback):
         self.env = model.env
 
     def _on_step(self) -> bool:
-        #print(self.num_timesteps)
+        # print(self.num_timesteps)
         return True
 
 
 def print_hi(name):
-    from stable_baselines3 import A2C
-
     env = MecMobaDQNEvn()
 
-    model = DQN('MlpPolicy', env, verbose=1, learning_starts=500)
-    model.learn(total_timesteps=10000, callback=MyCallBack())
+    learn_weeks = 52 * 10
+
+    checkpoint_callback = CheckpointCallback(save_freq=1008, save_path='./logs/',
+                                             name_prefix='rl_mpl_model')
+
+    model = DQN('MlpPolicy', env, verbose=1, learning_starts=1008 * 2)
+    model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 
     obs = env.reset()
     for i in range(1000):
