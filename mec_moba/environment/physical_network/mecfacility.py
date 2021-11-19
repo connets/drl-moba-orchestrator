@@ -7,6 +7,9 @@ class MecFacility(object):
         self._capacity = capacity
         self.deployed_matches = dict()
 
+    def reset(self):
+        self.deployed_matches = dict()
+
     @property
     def facility_id(self):
         return self._facility_id

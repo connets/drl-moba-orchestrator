@@ -18,28 +18,21 @@ defaults = {MAX_MATCH_QUEUE_SIZE_PARAM: 100,
 
 class MatchController:
 
-    # @staticmethod
-    # def get_module_config_name() -> str:
-    #     return 'match_controller'
-    #
-    # @staticmethod
-    # def get_module_config_options() -> Iterable[ConfigOption]:
-    #     return [ConfigOption(name=MAX_MATCH_QUEUE_SIZE_PARAM, default_value=100, help_string='Max match queue size'),
-    #             ConfigOption(name=MAX_WAITING_TIME_VALUE_PARAM, default_value=4, cli_type=int)]
-
     def __init__(self, environment, physical_net_ctl):
         # coda di attesa
-        self.queue: List[Game] = list()
-        self.drop_ratio = 0
+
         self.environment = environment
         self.physical_net_ctl = physical_net_ctl
 
-        # coda running
-        self.running: List = list()
+        self._initial_status()
 
         # lunghezza massima della coda
         self.max_wait_size = defaults[MAX_MATCH_QUEUE_SIZE_PARAM]
-        self.n_migration = 0
+
+    def _initial_status(self):
+        self.queue: List[Game] = list()
+        self.drop_ratio = 0
+        self.running: List = list()
 
     # manda la lsita delle partite da migrare
     def get_migrate_and_blocked_list(self, d):
@@ -53,9 +46,6 @@ class MatchController:
                         match.get_base_stations()]) >= current_qos and j != match.get_facility_id():
                     migrable_vnf.append(match)
                     break
-        # count = len(migrable_vnf)
-        # self.migrable_vnf = sorted(self.migrable_vnf, key=lambda v: v.get_QoS())
-        # return count / len(self.running)
 
         to_ret = nsmallest(round(len(migrable_vnf) * d / 100), migrable_vnf, key=lambda v: v.get_QoS())
 
@@ -82,15 +72,6 @@ class MatchController:
     def migrate(self, match, old_facility_id, new_facility_id):
         new_rtt = self._get_match_facility_rtt(match, new_facility_id)
         match.migrate(new_facility_id, new_rtt)
-
-    # def remove_match(self, n: int):
-    #     try:
-    #         tmp = self.running.pop(n)
-    #         self.physical_net_ctl.set_mec_status(tmp.get_facility_id(), -1)
-    #         return True
-    #     except IndexError:
-    #         print("match controller index error")
-    #         return False
 
     def _get_match_facility_rtt(self, match, facility_id):
         return max([self.physical_net_ctl.get_rtt(k, facility_id) for k in match.get_base_stations()])
@@ -157,19 +138,5 @@ class MatchController:
     def get_queue_drop_rate(self):
         return self.drop_ratio
 
-    # def get_migrations(self):
-    #     to_ret = self.n_migration
-    #     self.n_migration = 0
-    #     return to_ret
-
-    def _save(self) -> typing.Dict[str, typing.Any]:
-        return {self.__class__.__name__: {'queue': self.queue,
-                                          'running': self.running}}
-
-    def _restore(self, saved_objects: typing.Dict):
-        self.queue = saved_objects[self.__class__.__name__]['queue']
-        self.running = saved_objects[self.__class__.__name__]['running']
-
-        # deploy running in physical network to restore everything
-        for match in self.running:
-            self.physical_net_ctl.deploy(match, match.get_facility_id)
+    def change_epoch(self):
+        self._initial_status()

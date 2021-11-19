@@ -227,6 +227,8 @@ class Environment:
         # self._start_time = current_time
         # print(f"Epoch {self._epoch} done in {epoch_elapsed_time} seconds")
         # self._epoch += 1  # this order of instructions is important because save the next epoch number
+        self.match_controller.change_epoch()
+        self.physical_network.change_epoch()
         self.match_generator.change_epoch()
 
     def validate_action(self, action: DqnAction):

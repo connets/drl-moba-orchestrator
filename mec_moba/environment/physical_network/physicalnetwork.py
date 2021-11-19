@@ -25,8 +25,12 @@ class PhysicalNetwork:
         self.delay_dict = info_physical_net['delays']
 
         self.n_bs, self.n_mec = info_physical_net['n_bs'], info_physical_net['n_mec']
-        facility_capacity = 10 #get_config_value(PhysicalNetwork.get_module_config_name(), FACILITY_CAPACITY_PARAM)
+        facility_capacity = 10  # get_config_value(PhysicalNetwork.get_module_config_name(), FACILITY_CAPACITY_PARAM)
         self._mec_facilities = {int(m): MecFacility(int(m), facility_capacity) for m in range(self.n_mec)}
+
+    def change_epoch(self):
+        for facility in self._mec_facilities.values():
+            facility.reset()
 
     def get_num_mec_facilities(self):
         return self.n_mec
