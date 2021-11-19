@@ -1,9 +1,14 @@
+import os
+from time import time
+
 import gym
 
 # This is a sample Python script.
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+from gym.utils.env_checker import check_env
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
@@ -21,15 +26,20 @@ class MyCallBack(BaseCallback):
         return True
 
 
-def print_hi(name):
+def main():
+    log_dir = "./tmp/gym/{}".format(int(time()))
+    os.makedirs(log_dir, exist_ok=True)
+
     env = MecMobaDQNEvn()
+    # env = Monitor(env, log_dir, allow_early_resets=True)
+    check_env(env, warn=True)
 
     learn_weeks = 52 * 10
 
     checkpoint_callback = CheckpointCallback(save_freq=1008, save_path='./logs/',
                                              name_prefix='rl_mpl_model')
 
-    model = DQN('MlpPolicy', env, verbose=1, learning_starts=1008 * 2)
+    model = DQN('MlpPolicy', env, verbose=1, learning_starts=100, tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 
     obs = env.reset()
@@ -44,6 +54,6 @@ def print_hi(name):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    main()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
