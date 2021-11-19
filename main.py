@@ -8,6 +8,7 @@ import gym
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 from gym.utils.env_checker import check_env
+from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
@@ -31,7 +32,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     env = MecMobaDQNEvn()
-    # env = Monitor(env, log_dir, allow_early_resets=True)
+    env = FlattenObservation(env)
     check_env(env, warn=True)
 
     learn_weeks = 52 * 10
