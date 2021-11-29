@@ -20,15 +20,20 @@ class MecMobaDQNEvn(gym.Env):
         actions = filter(lambda a: a[2] + a[3] > 0, actions)
         return {a_id: DqnAction(*a) for a_id, a in enumerate(actions)}
 
-    def __init__(self):
+    def __init__(self, log_match_data=False, base_log_dir=None):
         super(MecMobaDQNEvn, self).__init__()
         self.observation_space = Box(low=0.0, high=1.0, shape=(1, 21))
         self._actions_dict = MecMobaDQNEvn._create_action_space_map()
         self.action_space = Discrete(len(self._actions_dict))
 
         self._internal_env = Environment()
-        self.state_obs = self._initial_observation()
+        # self.state_obs = self._initial_observation()
         self.t_slot = 0
+        self._rng_seed = None
+
+        self._log_match_data = log_match_data
+        self._base_log_dir = base_log_dir
+        assert not log_match_data or (log_match_data and base_log_dir is not None)
 
     def action_id_to_human(self, action):
         return self._actions_dict[action]
@@ -41,6 +46,9 @@ class MecMobaDQNEvn(gym.Env):
         action_: DqnAction = self._actions_dict[action]
         action_result = action_controller.do_action(action_, self._internal_env)
         self._internal_env.implement_action(action_result)
+        if self._log_match_data:
+            self.log_all_matches_data()
+
         week_end = self._internal_env.inc_timeslot()
         self._internal_env.cleanup_terminated_matches(t_slot_end=False)
         new_match_requests = self._internal_env.match_generator.get_match_requests(self._internal_env.epoch_t_slot)
@@ -57,13 +65,22 @@ class MecMobaDQNEvn(gym.Env):
         self._internal_env.reset()
         return self._initial_observation()
 
-    def render(self, mode="human"):
-        pass
-        # env_state = np.zeros((10 + 3, 12))
-        # t_slot_state = self._internal_env.get_time_slot_state()
-        # for i, f_l in enumerate(t_slot_state.facility_utilization):
-        #     f_l = max(0, int(round((f_l * 10))))
-        #     env_state[i, :f_l - 1] = 1
+    def log_all_matches_data(self):
+        self._internal_env.log_all_matches_data(log_dir=self._base_log_dir)
 
-        # for r in reversed(range(env_state.shape[0])):
-        #     print("".join(["*" if x == 1 else " " for x in env_state[r, :]]))
+    def render(self, mode="human"):
+        return
+
+    #     pass
+    #     # env_state = np.zeros((10 + 3, 12))
+    #     # t_slot_state = self._internal_env.get_time_slot_state()
+    #     # for i, f_l in enumerate(t_slot_state.facility_utilization):
+    #     #     f_l = max(0, int(round((f_l * 10))))
+    #     #     env_state[i, :f_l - 1] = 1
+    #
+    #     # for r in reversed(range(env_state.shape[0])):
+    #     #     print("".join(["*" if x == 1 else " " for x in env_state[r, :]]))
+
+    def seed(self, seed=None):
+        self._rng_seed = seed
+        self._internal_env.set_seed(seed)

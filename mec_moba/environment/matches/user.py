@@ -12,3 +12,6 @@ class User(object):
 
     def set_bs(self, new_bs):
         self.bs = new_bs
+
+    def __repr__(self):
+        return str(self.bs)

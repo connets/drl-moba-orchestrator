@@ -10,7 +10,7 @@ import gym
 from gym.utils.env_checker import check_env
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
 from mec_moba.envs import MecMobaDQNEvn
@@ -33,14 +33,21 @@ def main():
 
     env = MecMobaDQNEvn()
     env = FlattenObservation(env)
-    check_env(env, warn=True)
+    #check_env(env, warn=True)
 
     learn_weeks = 52 * 10
+    save_freq_steps = 1008*10
 
-    checkpoint_callback = CheckpointCallback(save_freq=1008, save_path='./logs/',
-                                             name_prefix='rl_mpl_model')
+    checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
+                                             name_prefix='rl_mlp_model')
 
-    model = DQN('MlpPolicy', env, verbose=1, learning_starts=100, tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    # model = DQN('MlpPolicy', env,
+    #             verbose=1, learning_starts=1000,
+    #             tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+
+    model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
+                vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
+    model.set_random_seed(1000)
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 
     obs = env.reset()

@@ -4,20 +4,21 @@ import logging
 import time
 import typing
 from typing import Sized
-
-# ActionResultsInstructions
+from collections import namedtuple
+import numpy as np
 
 from mec_moba.environment.matches import GameGenerator, MatchController
 from mec_moba.environment.physical_network.physicalnetwork import PhysicalNetwork
 
 import mec_moba.environment.utils.utils as utils
+import mec_moba.environment.utils.logging_utils as logging_utils
 
 VALIDATE_ACTION_PARAM = 'validate_action'
 
 if typing.TYPE_CHECKING:
     from mec_moba.environment.action_controller import DqnAction, ActionResultsInstructions
 
-import numpy as np
+MatchLogRecord = namedtuple('MatchLogRecord', field_names=['t_slot', 'match_id', 'facility_id'])
 
 
 def load_single_env(instance, generic_dict):
@@ -163,19 +164,12 @@ class Environment:
     def absolute_t_slot(self):
         return self._absolute_t_slot
 
+    def set_seed(self, seed):
+        self.match_generator.set_seed(seed)
+
     def reset(self) -> TimeSlotSnapshot:
         self.change_epoch()
         return self.get_time_slot_state()
-
-    # def simulate(self, num_epoch):
-    #     logging.info(f'Starting simulation of {num_epoch} epochs')
-    #     self._start_time = time.time()
-    #     self.match_generator.change_epoch()
-    #     next_state_available = False
-    #     while self._epoch < num_epoch:
-    #         yield self._epoch, self._epoch_t_slot, next_state_available
-    #         next_state_available = True
-    #         self.inc_timeslot()
 
     def _read_and_set_observable_state(self):
         self.t_slot_state = TimeSlotSnapshot(running_qos_prob=self.match_controller.get_qos_state(),
@@ -213,7 +207,7 @@ class Environment:
         return reward, split_rewards
 
     def inc_timeslot(self) -> bool:
-        #print('running matches', len(self.match_controller.running))
+        # print('running matches', len(self.match_controller.running))
         self._epoch_t_slot = (self._epoch_t_slot + 1) % 1008
         self._absolute_t_slot += 1
         self.match_controller.update_qos()
@@ -267,6 +261,7 @@ class Environment:
         # for match in match_requests:
 
     def implement_action(self, action_result: ActionResultsInstructions):
+        # pre_running = len(self.match_controller.running)
         for deploy_inst in action_result.get_matches_to_deploy():
             self.match_controller.deploy(deploy_inst.match, deploy_inst.facility_id)
             self.physical_network.deploy(deploy_inst.match, deploy_inst.facility_id)
@@ -275,55 +270,16 @@ class Environment:
             self.match_controller.migrate(mig_inst.match, mig_inst.old_facility_id, mig_inst.new_facility_id)
             self.physical_network.migrate(mig_inst.match, mig_inst.old_facility_id, mig_inst.new_facility_id)
 
+        # assert len(self.match_controller.running) == pre_running + len(action_result.get_matches_to_deploy())
+        # assert len(self.match_controller.running) == sum([len(f.deployed_matches) for f in self.physical_network._mec_facilities.values()])
+
     def cleanup_terminated_matches(self, t_slot_end: bool):
         self.match_controller.cleanup_terminated_matches(t_slot_end)
 
-    # def _get_log_name(self):
-    #     return f"{Environment.__name__}_output_training" if self.training_mode else f'{Environment.__name__}_output_evaluation'
-    #
-    # def log_time_slot_stats(self,
-    #                         state: TimeSlotSnapshot,
-    #                         e_greedy_value: float,
-    #                         beta_IS: float,
-    #                         action: DqnAction,
-    #                         is_random: bool,
-    #                         is_feasible: bool,
-    #                         reward: float,
-    #                         reward_comp: List[float],
-    #                         next_state: TimeSlotSnapshot):
-    #
-    #     to_write = [self._epoch, self._epoch_t_slot, e_greedy_value, is_random, beta_IS]
-    #     to_write += state.to_log_format()
-    #     to_write += [action.to_log_format(), is_feasible] + reward_comp + [reward]
-    #     to_write += next_state.to_log_format()
-    #     Environment.write_to_log(self._get_log_name(), *to_write)
-    #
-    # # Save & Restore
-    # def _save(self) -> typing.Dict[str, typing.Any]:
-    #     return {self.__class__.__name__: {'epoch': self._epoch,
-    #                                       'epoch_t_slot': self._epoch_t_slot}}
-    #
-    # def _restore(self, saved_objects: typing.Dict):
-    #     self._epoch = saved_objects[self.__class__.__name__]['epoch']
-    #     self._epoch_t_slot = saved_objects[self.__class__.__name__]['epoch_t_slot']
+    def log_all_matches_data(self, log_dir):
+        # print(self._epoch_t_slot)
+        data_to_log = [MatchLogRecord(self._epoch_t_slot, m.id, f.facility_id)
+                       for f in self.physical_network.get_mec_facilities()
+                       for m in f.get_deployed_matches()]
 
-# _env_instance: Optional[Environment] = None
-#
-#
-# def create_environment(training_mode=True):
-#     global _env_instance
-#     if _env_instance is None:
-#         _env_instance = Environment(training_mode=training_mode)
-#     return _env_instance
-#
-#
-# def get_environment() -> Environment:
-#     if _env_instance is None:
-#         raise RuntimeError("Environment has not initialized yet!")
-#     return _env_instance
-#
-#
-# def get_env_absolute_t_slot_time() -> int:
-#     if _env_instance is None:
-#         raise RuntimeError("Environment has not initialized yet!")
-#     return _env_instance.absolute_timeslot
+        logging_utils.log_to_csv_file(log_dir, 'match_data.csv', data_to_log)

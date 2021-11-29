@@ -76,6 +76,9 @@ class GameGenerator:
 
         self.epoch_games_generated = 0
 
+    def set_seed(self, seed):
+        self.rng = np.random.default_rng(seed)
+
     def get_duration(self):
         return self.duration
 
@@ -101,7 +104,7 @@ class GameGenerator:
         # if t_slot key is not in the dictionary it means zero matches!!
         x = list(self.history.get(t_slot, []))
         self.epoch_games_generated += len(x)
-        #print('Game generated ', t_slot, self.epoch_games_generated)
+        # print('Game generated ', t_slot, self.epoch_games_generated)
         return x
 
     def check_overlapping(self, l) -> bool:
@@ -109,7 +112,7 @@ class GameGenerator:
         return False
 
     def _get_random_group(self):
-        r = np.random.randint(len(self.groups))
+        r = self.rng.integers(low=0, high=len(self.groups))  # randint(len(self.groups))
         if not self.no_overlapping:
             return [User(int(j), self.users_bss[int(j)]) for j in self.groups[r]]
         else:

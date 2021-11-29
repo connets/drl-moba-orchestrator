@@ -1,3 +1,5 @@
+from typing import List
+
 from mec_moba.environment.matches import Game
 
 
@@ -13,6 +15,9 @@ class MecFacility(object):
     @property
     def facility_id(self):
         return self._facility_id
+
+    def get_deployed_matches(self) -> List[Game]:
+        return list(self.deployed_matches.values())
 
     def deploy(self, match: Game):
         self.deployed_matches[match.id] = match

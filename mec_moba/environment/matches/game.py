@@ -131,4 +131,4 @@ class Game(object):
         return self.game_id == other.get_id()
 
     def __repr__(self):
-        return f'{self.game_id}'
+        return f'{self.game_id} BSs: {self.group}'

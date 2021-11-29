@@ -24,6 +24,10 @@ class MatchController:
         self.environment = environment
         self.physical_net_ctl = physical_net_ctl
 
+        self.queue: List[Game] = list()
+        self.drop_ratio = 0
+        self.running: List = list()
+
         self._initial_status()
 
         # lunghezza massima della coda
@@ -88,6 +92,12 @@ class MatchController:
                 self.physical_net_ctl.terminate_match(match, match.get_facility_id())
             else:
                 next_t_slot_running.append(match)
+
+        # assert all(map(lambda m: not m.is_terminated(current_t_slot, t_slot_end), next_t_slot_running))
+        # for m in self.running:
+        #     if m not in next_t_slot_running:
+        #         assert current_t_slot - m.deploy_time >= m.duration
+
         self.running = next_t_slot_running
 
     def get_actions_infos(self, c, d):
@@ -108,6 +118,8 @@ class MatchController:
                 match.enqueue(current_t_slot)
             else:
                 dropped_match_requests += 1
+
+        #assert all(map(lambda m: m in self.queue, match_requests))
 
         self.drop_ratio = dropped_match_requests / len(match_requests) if len(match_requests) > 0 else 0
 
