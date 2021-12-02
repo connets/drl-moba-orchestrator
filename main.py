@@ -1,7 +1,7 @@
 import os
 from time import time
 
-import gym
+import argparse
 
 # This is a sample Python script.
 
@@ -16,34 +16,48 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from mec_moba.envs import MecMobaDQNEvn
 
 
-class MyCallBack(BaseCallback):
+def parse_cli_args():
+    parser = argparse.ArgumentParser(description="DRL MOBA on Stable Baseline 3")
+    parser.add_argument('--train-epochs', type=int, default=52 * 10, help="Number of training weeks")
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--seed', type=int, required=False, default=None)
+    dqn_grp_parser = parser.add_argument_group('DQN')
+    dqn_grp_parser.add_argument('--dqn-batch-size', default=32, type= int)
+    dqn_grp_parser.add_argument('--dqn-buffer-size', default=100_000, type=int)
+    dqn_grp_parser.add_argument('--dqn-final-epsilon',default=0.05, type=float)
+    dqn_grp_parser.add_argument('--dqn-learning-starts', default=5000)
+    dqn_grp_parser.add_argument('--dqn-exploration_fraction', default= 0.1)
 
-    def init_callback(self, model):
-        super(MyCallBack, self).init_callback(model)
-        self.env = model.env
 
-    def _on_step(self) -> bool:
-        # print(self.num_timesteps)
-        return True
+    resume_evaluate_mtx_grp = parser.add_mutually_exclusive_group()
+    resume_evaluate_mtx_grp.add_argument('--resume', action='store_true')
+    resume_evaluate_mtx_grp.add_argument('--evaluate', action='store_true')
+
+    return parser.parse_args()
 
 
-def main():
-    log_dir = "./tmp/gym/{}".format(int(time()))
-    os.makedirs(log_dir, exist_ok=True)
+def main(cli_args):
+    # log_dir = "./tmp/gym/{}".format(int(time()))
+    # os.makedirs(log_dir, exist_ok=True)
 
     env = MecMobaDQNEvn()
     env = FlattenObservation(env)
-    #check_env(env, warn=True)
+    # check_env(env, warn=True)
 
     learn_weeks = 52 * 10
-    save_freq_steps = 1008*10
+    save_freq_steps = 1008 * 10
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
                                              name_prefix='rl_mlp_model')
 
-    # model = DQN('MlpPolicy', env,
-    #             verbose=1, learning_starts=1000,
-    #             tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    model = DQN('MlpPolicy', env,
+                verbose=1,
+                learning_starts=10_000,
+                buffer_size=100_000,
+                target_update_interval=1008,
+                exploration_final_eps=0.01,
+                batch_size=128,
+                tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
                 vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
@@ -62,6 +76,6 @@ def main():
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    main()
+    main(cli_args=parse_cli_args())
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

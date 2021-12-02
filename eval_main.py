@@ -37,7 +37,7 @@ for seed in seeds:
     # check_env(env, warn=True)
 
     # MODIFICA PATH!!!!
-    model = DQN.load("logs/rl_mpl_model_4466448_steps")
+    model = DQN.load("logs/trained_models/dqn_rl_mlp_model_4324320_steps")
     # mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=5, deterministic=True)
     model.set_random_seed(seed)
 

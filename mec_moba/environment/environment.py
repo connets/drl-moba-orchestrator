@@ -109,7 +109,7 @@ def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: Ac
     _, op_min_val_feasible = sorted(filter(lambda e: e[0] >= 0, zip(op_min_values, [0, 10, 20, 30, 40])))[0]
     # op_cost = (op_val - op_min_val_feasible) / 100 * self.Physical_net.n_mec
     op_val = action.over_provisioning_value
-    op_cost = (op_val - op_min_val_feasible) / 10 if op_val > 0 else 0
+    op_cost = (op_val - op_min_val_feasible) / environment.physical_network.n_mec if op_val > 0 else 0
     if op_cost > 0:
         # bonus if v_j from PLI results have brought to a better solution
         op_cost -= sum(v_j / facility.capacity
