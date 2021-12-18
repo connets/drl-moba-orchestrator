@@ -25,7 +25,8 @@ grid_search_params = ['learning_starts',
                       'exploration_final_eps',
                       'batch_size',
                       'learning_rate',
-                      'train_freq']
+                      'train_freq',
+                      'reward_weights']
 
 run_parameter_fields_to_save = ['run_id', 'train_epochs', 'seed'] + grid_search_params
 extra_run_parameter_fields = ['base_dir']  # these extras fields are needed internally but are not saved
@@ -41,7 +42,8 @@ sqlite_field_type_dict = {'run_id': 'text',
                           'exploration_final_eps': 'real',
                           'batch_size': 'integer',
                           'learning_rate': 'real',
-                          'train_freq': 'integer'
+                          'train_freq': 'integer',
+                          'reward_weights': 'text'
                           }
 
 assert all(map(lambda k: k in sqlite_field_type_dict, run_parameter_fields_to_save))
@@ -58,18 +60,21 @@ def table_creation_utils(db_conn):
 
 
 def insert_all_runs(db_conn, experiments):
-
     cur = db_conn.cursor()
     # print(f"insert into experiments ( {','.join(['?'] * len(sqlite_field_type_dict))})")
+
+    def convert_if_str(k, v):
+        return str(v) if sqlite_field_type_dict[k] == 'text' else v
+
     # experiments = (e._asdict() for e in experiments)
-    experiments = (tuple(getattr(e, k) for k in run_parameter_fields_to_save) for e in experiments)
+    experiments = (tuple(convert_if_str(k,getattr(e, k)) for k in run_parameter_fields_to_save) for e in experiments)
     cur.executemany(f"insert into experiments values ( {','.join(['?'] * len(sqlite_field_type_dict))})", experiments)
     db_conn.commit()
     cur.close()
 
 
 def training_process(run_params: RunParameters):
-    env = MecMobaDQNEvn()
+    env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
     env = FlattenObservation(env)
     # check_env(env, warn=True)
     model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')

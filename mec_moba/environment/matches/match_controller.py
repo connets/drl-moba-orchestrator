@@ -119,7 +119,7 @@ class MatchController:
             else:
                 dropped_match_requests += 1
 
-        #assert all(map(lambda m: m in self.queue, match_requests))
+        # assert all(map(lambda m: m in self.queue, match_requests))
 
         self.drop_ratio = dropped_match_requests / len(match_requests) if len(match_requests) > 0 else 0
 
@@ -145,7 +145,8 @@ class MatchController:
 
     def get_mean_queue_waiting_time(self):
         current_t_slot = self.environment.absolute_t_slot
-        return sum(map(lambda e: min(4, utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue), ) / len(self.queue) if len(self.queue) > 0 else 0
+        ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue)
+        return sum(ret_value) / len(self.queue) / defaults[MAX_WAITING_TIME_VALUE_PARAM] if len(self.queue) > 0 else 0
 
     def get_queue_drop_rate(self):
         return self.drop_ratio

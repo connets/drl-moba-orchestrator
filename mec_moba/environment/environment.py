@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-import time
 import typing
 from typing import Sized
 from collections import namedtuple
@@ -109,13 +107,12 @@ def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: Ac
     _, op_min_val_feasible = sorted(filter(lambda e: e[0] >= 0, zip(op_min_values, [0, 10, 20, 30, 40])))[0]
     # op_cost = (op_val - op_min_val_feasible) / 100 * self.Physical_net.n_mec
     op_val = action.over_provisioning_value
-    op_cost = (op_val - op_min_val_feasible) / environment.physical_network.n_mec if op_val > 0 else 0
+    op_cost = (op_val - op_min_val_feasible)  # / environment.physical_network.n_mec if op_val > 0 else 0
+    op_cost /= 40
     if op_cost > 0:
         # bonus if v_j from PLI results have brought to a better solution
-        op_cost -= sum(v_j / facility.capacity
-                       for v_j, facility in zip(act_res_inst.get_facilities_used_op_levels(),
-                                                environment.physical_network.get_mec_facilities()))  # NOTE optimal_v_j_values contains not normalized values!!!
-        op_cost = max(0, op_cost)  # Dealing with too good optimization
+        op_cost -= sum(v_j / 4 for v_j in act_res_inst.get_facilities_used_op_levels()) / environment.physical_network.n_mec
+        # op_cost = max(0, op_cost)  # Dealing with too good optimization
 
     return -op_cost
 
@@ -136,8 +133,8 @@ def queue_drop_ratio_reward_cmp(environment, action: DqnAction, act_res_inst: Ac
 
 reward_comp = {'queue_occ': (_queue_occupation_reward_cmp, -1),
                'load_balance': (load_balancing_reward_cmp, -1),
-               'op_cost': (overprovisioning_reward_cmp, -4),
-               'waiting_time': (queue_waiting_time, -4),
+               'op_cost': (overprovisioning_reward_cmp, -1),
+               'waiting_time': (queue_waiting_time, -1),
                'queue_drop_rate': (queue_drop_ratio_reward_cmp, -1),
                'free_capacity': (free_capacity_reward_cmp, -1)
                }
@@ -145,11 +142,15 @@ reward_comp_order = ['load_balance', 'op_cost', 'waiting_time', 'queue_occ', 'qu
 
 
 class Environment:
+    @staticmethod
+    def default_reward_weights():
+        return tuple([1] * len(reward_comp_order))
 
-    def __init__(self):
+    def __init__(self, reward_weights):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
         self.match_generator = GameGenerator()
+        self.reward_weights = reward_weights
 
         self.validate_action_enabled = False  # get_config_value(Environment.get_module_config_name(), VALIDATE_ACTION_PARAM)
 
@@ -201,7 +202,9 @@ class Environment:
         else:
             split_rewards = [reward_comp[rw_cmp][1] for rw_cmp in reward_comp_order]
 
-        worst_value_sum = abs(sum(v for _, v in reward_comp.values()))  # the sum is negative so I use abs
+        split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights)]
+
+        worst_value_sum = abs(sum(w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
         reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
 
         return reward, split_rewards
