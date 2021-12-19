@@ -111,7 +111,7 @@ def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: Ac
     op_cost /= 40
     if op_cost > 0:
         # bonus if v_j from PLI results have brought to a better solution
-        op_cost -= sum(v_j / 4 for v_j in act_res_inst.get_facilities_used_op_levels()) / environment.physical_network.n_mec
+        op_cost -= sum((v_j / 4) - op_min_val_feasible / 40 for v_j in act_res_inst.get_facilities_used_op_levels()) / environment.physical_network.n_mec
         # op_cost = max(0, op_cost)  # Dealing with too good optimization
 
     return -op_cost

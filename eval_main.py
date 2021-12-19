@@ -16,7 +16,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 
 from mec_moba.envs import MecMobaDQNEvn
 
-seeds = [1000, 4000, 7000]
+seeds = [1000]
 
 state_columns = [f'qos_{i}' for i in range(6)]
 state_columns += [f'f_{i}' for i in range(10)]
@@ -30,14 +30,14 @@ head_line += next_state_columns + ['reward']
 
 for seed in seeds:
     os.makedirs(f'logs/{seed}', exist_ok=True)
-
-    env = MecMobaDQNEvn(log_match_data=True, base_log_dir=f'logs/{seed}/match_logs')
+    reward_weights = (1, 2, 1, 0, 0, 0)
+    env = MecMobaDQNEvn(reward_weights=reward_weights, log_match_data=True, base_log_dir=f'logs/{seed}/match_logs')
     env = Monitor(env)
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
     # MODIFICA PATH!!!!
-    model = DQN.load("logs/trained_models/dqn_rl_mlp_model_4324320_steps")
+    model = DQN.load("out/dqn_icdcs22_2021_12_18_rw_param/2/saved_models/dqn_mlp_model_1048320_steps")
     # mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=5, deterministic=True)
     model.set_random_seed(seed)
 
