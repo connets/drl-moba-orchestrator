@@ -22,14 +22,15 @@ class MecMobaDQNEvn(gym.Env):
 
     def __init__(self, reward_weights=None, log_match_data=False, base_log_dir=None):
         super(MecMobaDQNEvn, self).__init__()
-        self.observation_space = Box(low=0.0, high=1.0, shape=(1, 21))
-        self._actions_dict = MecMobaDQNEvn._create_action_space_map()
-        self.action_space = Discrete(len(self._actions_dict))
-
         if reward_weights is None:
             reward_weights = Environment.default_reward_weights()
 
         self._internal_env = Environment(reward_weights=reward_weights)
+
+        self.observation_space = Box(low=0.0, high=1.0, shape=(1, self._internal_env.get_time_slot_state_n_features()))
+        self._actions_dict = MecMobaDQNEvn._create_action_space_map()
+        self.action_space = Discrete(len(self._actions_dict))
+
         # self.state_obs = self._initial_observation()
         self.t_slot = 0
         self._rng_seed = None

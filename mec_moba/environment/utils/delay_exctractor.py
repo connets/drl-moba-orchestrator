@@ -2,12 +2,17 @@ import pickle
 import csv
 import pandas
 
-allowed_facilities = set(range(10))
+allowed_facilities = {5, 16, 17, 19, 25, 30, 31}
+
 
 def extract_delay():
-    df = pandas.read_csv('data/BS_Facility_delay_NEW.csv.gz')
-    df = df[df.m1.isin(allowed_facilities)]
-    delay_dict = dict(zip(zip(df.t_slot, df.enb, df.m1), df.delay))
+    df = pandas.read_csv('data/BS_Facility_delay_NEW_bh_30.csv.gz')
+    df = df[df.facility.isin(allowed_facilities)]
+
+    # re-number facilities id
+    old2new_id = dict(zip(allowed_facilities, range(len(allowed_facilities))))
+    df['facility'] = df.facility.apply(lambda f: old2new_id[f])
+    delay_dict = dict(zip(zip(df.t_slot, df.enb, df.facility), df.delay))
     n_bs = df.enb.nunique()
     n_mec = len(allowed_facilities)
 

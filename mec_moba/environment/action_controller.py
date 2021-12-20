@@ -162,7 +162,9 @@ def do_action(action, environment) -> ActionResultsInstructions:
     n_mec = environment.physical_network.n_mec
     gamma = 1  # TODO from config
     assignment_cost = environment.build_assignment_cost(len(selected_instancies) + len(instances_deploy), assignable_instances_N)
-    current_assignment_costs = [pow(x.get_QoS() - 5, 2) / 5 for x in selected_instancies]
+
+    current_assignment_costs = [x.get_QoS() - 5 for x in selected_instancies]
+
     migration_cost = [1] * len(selected_instancies)
     old_f = [i.get_facility_id() for i in selected_instancies]
     op_costs = [1] * n_mec

@@ -22,12 +22,11 @@ def parse_cli_args():
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--seed', type=int, required=False, default=None)
     dqn_grp_parser = parser.add_argument_group('DQN')
-    dqn_grp_parser.add_argument('--dqn-batch-size', default=32, type= int)
+    dqn_grp_parser.add_argument('--dqn-batch-size', default=32, type=int)
     dqn_grp_parser.add_argument('--dqn-buffer-size', default=100_000, type=int)
-    dqn_grp_parser.add_argument('--dqn-final-epsilon',default=0.05, type=float)
+    dqn_grp_parser.add_argument('--dqn-final-epsilon', default=0.05, type=float)
     dqn_grp_parser.add_argument('--dqn-learning-starts', default=5000)
-    dqn_grp_parser.add_argument('--dqn-exploration_fraction', default= 0.1)
-
+    dqn_grp_parser.add_argument('--dqn-exploration_fraction', default=0.1)
 
     resume_evaluate_mtx_grp = parser.add_mutually_exclusive_group()
     resume_evaluate_mtx_grp.add_argument('--resume', action='store_true')
@@ -40,7 +39,7 @@ def main(cli_args):
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaDQNEvn()
+    env = MecMobaDQNEvn(reward_weights=(1, 2, 2, 0, 0, 0))
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
@@ -55,12 +54,13 @@ def main(cli_args):
                 learning_starts=10_000,
                 buffer_size=100_000,
                 target_update_interval=1008,
+                exploration_fraction=0.5,
                 exploration_final_eps=0.01,
                 batch_size=128,
                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
-    model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
-                vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
+    # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
+    #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
     model.set_random_seed(1000)
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 

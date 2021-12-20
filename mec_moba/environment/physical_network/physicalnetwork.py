@@ -55,7 +55,7 @@ class PhysicalNetwork:
         self._mec_facilities[facility_id].undeploy(match)
 
     def get_rtt(self, bs, mec):
-        return self.delay_dict[(self.environment.epoch_t_slot, bs, mec)] * 1.5
+        return self.delay_dict[(self.environment.epoch_t_slot, bs, mec)]
 
     def get_all_facilities_occupation(self, normalized):
         return [facility.get_facility_occupation(normalized=normalized) for facility in self._mec_facilities.values()]

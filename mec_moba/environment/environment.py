@@ -54,7 +54,7 @@ class TimeSlotSnapshot:
 
     @property
     def num_features(self) -> int:
-        return len(self.to_array())
+        return len(self.to_array()[0])
 
     # @property
     def to_array(self) -> Sized:
