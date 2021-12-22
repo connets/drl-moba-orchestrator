@@ -14,7 +14,7 @@ import pickle
 from mec_moba.environment.matches import GameGenerator
 
 T_SLOTS = 144
-T = T_SLOTS + 10
+T = T_SLOTS + 6*12
 F = 7
 N = int(3500 / 7)
 
@@ -28,13 +28,14 @@ for t_slot in range(T_SLOTS):
     for g in game_generator.get_match_requests(t_slot):
         games.append(g)  # .compute_QoS()
         request_time_sigma.append(t_slot)
-# for t_slot, n_games in collections.Counter(game_request_timeslot_sample).items():
-#     # each time slot game requests is a generator
-#     history[t_slot] = [groups[r] for _ in range(n_games)]
-# game_index = dict()
+
+pickle.dump([g.to_dict() for g in games], open('data/games.pkl', 'wb'))
+
 N = len(games)
 # for g in range(len(game_request_timeslot_sample)):
 #     game_index[g] = [users_bss[u] for u in groups[r]]
+
+print(N, F, T)
 
 cost_c = np.zeros((N, F, T))
 
@@ -80,17 +81,15 @@ m.setObjective(sum(sum(sum([cost_c[i, j, t] * x[i, j, t] for j in range(F)]) for
 
 #
 m.addConstrs(
-    (sum([x[i, j, t] for j in range(F)]) == sum([s[i, _t] for _t in range(max(0, t - delta), t)]) for i in range(N) for
-     t in
-     range(T)),
+    (sum([x[i, j, t] for j in range(F)]) == sum([s[i, _t] for _t in range(max(0, t - delta), t)]) for i in range(N) for t in range(T)),
     name='c0')
 
 #
 m.addConstrs((sum([s[i, t] for t in range(request_time_sigma[i], T)]) == 1 for i in range(N)),
              name='c1')
 
-# m.addConstrs((sum([s[i, t] for t in range(0, request_time_sigma[i])]) == 0 for i in range(N)),
-#              name='c1_2')
+m.addConstrs((sum([s[i, t] for t in range(0, request_time_sigma[i])]) == 0 for i in range(N)),
+             name='c1_2')
 #
 m.addConstrs(((x[i, j, t + 1] - x[i, j, t] <= y[i, t]) for i in range(N) for j in range(F) for t in range(T - 1)),
              name='c2')
@@ -112,14 +111,20 @@ if not hasattr(m, 'objVal'):
 
 else:
     print('success', m.objVal)
-    x_list = x.tolist()
     with open('data/x.csv', 'w', newline='') as fd:
         writer = csv.writer(fd)
         for t in range(T):
             for j in range(F):
                 for i in range(N):
-                    if x_list[i][j][t].x > 0:
-                        writer.writerow([t, j, i, x_list[i][j][t].x])
+                    if x[i][j][t].x > 0:
+                        writer.writerow([t, j, i, x[i][j][t].x])
+
+    with open('data/s.csv', 'w', newline='') as fd:
+        writer = csv.writer(fd)
+        for t in range(T):
+            for i in range(N):
+                if s[i, t].x > 0:
+                    writer.writerow([t, i, s[i, t].x])
 
 with open('data/sigma.csv', 'w', newline='') as f_d:
     writer = csv.writer(f_d)
