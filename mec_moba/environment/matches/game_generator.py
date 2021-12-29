@@ -17,7 +17,7 @@ QUEUE_EXIT_TIME_PARAM = 'queue_exit_time'
 MATCH_RESOURCE_PARAM = 'resource'
 NUM_USER_MATCH = 'num_user_match'
 
-defaults = {MAX_WAITING_TIME_PARAM: 3,
+defaults = {MAX_WAITING_TIME_PARAM: 0,
             NUM_GAMES_PER_EPOCH_PARAM: 3500,
             MAX_DURATION_PARAM: 10,
             QUEUE_EXIT_TIME_PARAM: None,
@@ -38,7 +38,7 @@ class GameGenerator:
     #             ConfigOption(name=NUM_USER_MATCH, default_value=4, help_string='Number of user per match')
     #             ]
 
-    def __init__(self, no_overlapping=False):
+    def __init__(self, gen_requests_until=None, no_overlapping=False):
         # distribuzione durata di una partita (la durata è in timeslots)
         self.duration = defaults[MAX_DURATION_PARAM]
         self.max_wait = defaults[MAX_WAITING_TIME_PARAM]
@@ -58,6 +58,7 @@ class GameGenerator:
 
         self.history = dict()
 
+        self.gen_requests_until = gen_requests_until
         # check se un giocatore sta già giocando una aprtita
         # e quindi evita che si crei un'altra partita
         self.no_overlapping = no_overlapping
@@ -101,10 +102,13 @@ class GameGenerator:
                     queue_abandon_time=self.exit_time)
 
     def get_match_requests(self, t_slot) -> List[Game]:
+        if self.gen_requests_until is not None and t_slot >= self.gen_requests_until:
+            return []
         # if t_slot key is not in the dictionary it means zero matches!!
         x = list(self.history.get(t_slot, []))
         self.epoch_games_generated += len(x)
-        # print('Game generated ', t_slot, self.epoch_games_generated)
+        #print('Game generated ', t_slot, self.epoch_games_generated)
+
         return x
 
     def check_overlapping(self, l) -> bool:

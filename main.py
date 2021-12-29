@@ -39,24 +39,24 @@ def main(cli_args):
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaDQNEvn(reward_weights=(1, 2, 2, 0, 0, 0))
+    env = MecMobaDQNEvn(reward_weights=(1, 2, 1))
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
     learn_weeks = 52 * 10
-    save_freq_steps = 1008 * 10
+    save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
                                              name_prefix='rl_mlp_model')
 
     model = DQN('MlpPolicy', env,
                 verbose=1,
-                learning_starts=10_000,
+                learning_starts=5_000,
                 buffer_size=100_000,
-                target_update_interval=1008,
-                exploration_fraction=0.5,
-                exploration_final_eps=0.01,
-                batch_size=128,
+                target_update_interval=2000,
+                exploration_fraction=0.1,
+                exploration_final_eps=0.02,
+                batch_size=64,
                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,

@@ -16,7 +16,7 @@ from mec_moba.environment.matches import GameGenerator
 T_SLOTS = 144
 T = T_SLOTS + 6*12
 F = 7
-N = int(3500 / 7)
+#N = int(3500 / 7)
 
 game_generator = GameGenerator()
 game_generator.set_seed(1000)
@@ -28,6 +28,8 @@ for t_slot in range(T_SLOTS):
     for g in game_generator.get_match_requests(t_slot):
         games.append(g)  # .compute_QoS()
         request_time_sigma.append(t_slot)
+
+print(len(games))
 
 pickle.dump([g.to_dict() for g in games], open('data/games.pkl', 'wb'))
 
@@ -49,7 +51,7 @@ for n in range(N):
             # fps = round(1000 / max([(delay_dict[(t % 1008, bs[0], f)]) for bs in game_index[n]]))
             # self.delay_dict[(self.environment.epoch_t_slot, bs, mec)]
             rtt = max(delay_dict[t, bs, f] for bs in games[n].get_base_stations())
-            cost_c[n, f, t] = games[n].compute_QoS(rtt)
+            cost_c[n, f, t] = 5 - games[n].compute_QoS(rtt)
 
 # [x for x in game_request_timeslot_sample]
 delta = 10
@@ -61,7 +63,7 @@ for n in range(N):
 # Create a new model
 m = gp.Model("DQN")
 m.Params.LogToConsole = 1
-m.Params.MIPGap = 0.09
+m.Params.MIPGap = 0.001
 m.Params.TimeLimit = 3000
 
 # Create variables

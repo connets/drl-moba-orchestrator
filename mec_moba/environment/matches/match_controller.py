@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from heapq import *
 from typing import Iterable, List
+import math
 
 import mec_moba.environment.utils.utils as utils
 
@@ -47,11 +48,11 @@ class MatchController:
                 # >= perchè in casi di sovraffollamento di una mec e le altre vuote potrebbe aver senso migrare
                 # per distribuire il peso
                 if min([match.compute_QoS(self.physical_net_ctl.get_rtt(bs, j)) for bs in
-                        match.get_base_stations()]) >= current_qos and j != match.get_facility_id():
+                        match.get_base_stations()]) > current_qos and j != match.get_facility_id():
                     migrable_vnf.append(match)
                     break
 
-        to_ret = nsmallest(round(len(migrable_vnf) * d / 100), migrable_vnf, key=lambda v: v.get_QoS())
+        to_ret = nsmallest(math.ceil(len(migrable_vnf) * d / 100), migrable_vnf, key=lambda v: v.get_QoS())
 
         return to_ret, [i for i in self.running if i not in to_ret]
 
@@ -64,7 +65,7 @@ class MatchController:
     # manda la lista delle partite da deployare
     def get_deploy_list(self, deploy_value):
         current_t_slot = self.environment.absolute_t_slot
-        return nsmallest(round(len(self.queue) * deploy_value / 100),
+        return nsmallest(math.ceil(len(self.queue) * deploy_value / 100),
                          self.queue, key=lambda match: - match.get_queue_waiting_time(current_t_slot))
 
     def deploy(self, match, facility_id):
@@ -135,6 +136,12 @@ class MatchController:
             tmp_qos[match.get_QoS()] += 1
 
         return list(map(lambda a: a / len(self.running), tmp_qos))
+
+    def get_mean_qos_running_instances(self) -> float:
+        if len(self.running) == 0:
+            return -1
+
+        return sum([5 - m.get_QoS() for m in self.running]) / len(self.running)
 
     def get_mean_running_time_state(self) -> float:
         current_t_slot = self.environment.absolute_t_slot

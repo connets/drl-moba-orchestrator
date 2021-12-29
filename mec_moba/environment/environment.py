@@ -96,25 +96,26 @@ def load_balancing_reward_cmp(environment, action: DqnAction, act_res_inst: Acti
 
 
 def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: ActionResultsInstructions):
-    if action.is_no_action():
-        return 0
-
-    facility_occ = environment.physical_network.get_all_facilities_occupation(normalized=True)
-    op_min_values = [sum([(action.capacity_value + op) / 100
-                          for _ in range(environment.physical_network.n_mec)]) - sum(facility_occ)
-                     for op in [0, 10, 20, 30, 40]]
-
-    _, op_min_val_feasible = sorted(filter(lambda e: e[0] >= 0, zip(op_min_values, [0, 10, 20, 30, 40])))[0]
-    # op_cost = (op_val - op_min_val_feasible) / 100 * self.Physical_net.n_mec
-    op_val = action.over_provisioning_value
-    op_cost = (op_val - op_min_val_feasible)  # / environment.physical_network.n_mec if op_val > 0 else 0
-    op_cost /= 40
-    if op_cost > 0:
-        # bonus if v_j from PLI results have brought to a better solution
-        op_cost -= sum((v_j / 4) - op_min_val_feasible / 40 for v_j in act_res_inst.get_facilities_used_op_levels()) / environment.physical_network.n_mec
-        # op_cost = max(0, op_cost)  # Dealing with too good optimization
-
-    return -op_cost
+    return - action.over_provisioning_value / 100
+    # if action.is_no_action():
+    #     return 0
+    #
+    # facility_occ = environment.physical_network.get_all_facilities_occupation(normalized=True)
+    # op_min_values = [sum([(action.capacity_value + op) / 100
+    #                       for _ in range(environment.physical_network.n_mec)]) - sum(facility_occ)
+    #                  for op in [0, 10, 20, 30, 40]]
+    #
+    # _, op_min_val_feasible = sorted(filter(lambda e: e[0] >= 0, zip(op_min_values, [0, 10, 20, 30, 40])))[0]
+    # # op_cost = (op_val - op_min_val_feasible) / 100 * self.Physical_net.n_mec
+    # op_val = action.over_provisioning_value
+    # op_cost = (op_val - op_min_val_feasible)  # / environment.physical_network.n_mec if op_val > 0 else 0
+    # op_cost /= 40
+    # if op_cost > 0:
+    #     # bonus if v_j from PLI results have brought to a better solution
+    #     op_cost -= sum((v_j / 4) - op_min_val_feasible / 40 for v_j in act_res_inst.get_facilities_used_op_levels()) / environment.physical_network.n_mec
+    #     # op_cost = max(0, op_cost)  # Dealing with too good optimization
+    #
+    # return -op_cost
 
 
 def queue_waiting_time(environment, action: DqnAction, act_res_inst: ActionResultsInstructions):
@@ -131,14 +132,31 @@ def queue_drop_ratio_reward_cmp(environment, action: DqnAction, act_res_inst: Ac
     return - environment.match_controller.get_queue_drop_rate()
 
 
-reward_comp = {'queue_occ': (_queue_occupation_reward_cmp, -1),
-               'load_balance': (load_balancing_reward_cmp, -1),
+def mean_qos_reward_cmp(environment, action: DqnAction, act_res_inst: ActionResultsInstructions):
+    qos_mean = environment.match_controller.get_mean_qos_running_instances()
+    if qos_mean < 0:
+        return None
+    return - qos_mean / 5
+
+
+# reward_comp = {'queue_occ': (_queue_occupation_reward_cmp, -1),
+#                'load_balance': (load_balancing_reward_cmp, -1),
+#                'op_cost': (overprovisioning_reward_cmp, -1),
+#                'waiting_time': (queue_waiting_time, -1),
+#                'queue_drop_rate': (queue_drop_ratio_reward_cmp, -1),
+#                'free_capacity': (free_capacity_reward_cmp, -1)
+#                }
+reward_comp = {'qos': (mean_qos_reward_cmp, -1),
+               # 'load_balance': (load_balancing_reward_cmp, -1),
                'op_cost': (overprovisioning_reward_cmp, -1),
                'waiting_time': (queue_waiting_time, -1),
-               'queue_drop_rate': (queue_drop_ratio_reward_cmp, -1),
-               'free_capacity': (free_capacity_reward_cmp, -1)
+               # 'migration': (queue_drop_ratio_reward_cmp, -1),
+               # 'free_capacity': (free_capacity_reward_cmp, -1)
                }
-reward_comp_order = ['load_balance', 'op_cost', 'waiting_time', 'queue_occ', 'queue_drop_rate', 'free_capacity']
+
+# reward_comp_order = ['load_balance', 'op_cost', 'waiting_time', 'queue_occ', 'queue_drop_rate', 'free_capacity']
+
+reward_comp_order = ['qos', 'op_cost', 'waiting_time']
 
 
 class Environment:
@@ -146,11 +164,12 @@ class Environment:
     def default_reward_weights():
         return tuple([1] * len(reward_comp_order))
 
-    def __init__(self, reward_weights):
+    def __init__(self, reward_weights, gen_requests_until=None):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
-        self.match_generator = GameGenerator()
+        self.match_generator = GameGenerator(gen_requests_until)
         self.reward_weights = reward_weights
+        # self.gen_requests_until = gen_requests_until
 
         self.validate_action_enabled = False  # get_config_value(Environment.get_module_config_name(), VALIDATE_ACTION_PARAM)
 
@@ -202,11 +221,11 @@ class Environment:
         else:
             split_rewards = [reward_comp[rw_cmp][1] for rw_cmp in reward_comp_order]
 
-        split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights)]
+        split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights) if v is not None]
 
         worst_value_sum = abs(sum(w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
-        reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
-
+        # reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
+        reward = sum(split_rewards) / len(split_rewards)
         return reward, split_rewards
 
     def inc_timeslot(self) -> bool:
@@ -239,14 +258,17 @@ class Environment:
     def get_games(self):
         return self.match_controller.get_games()
 
-    def get_max_capacities(self):
+    def get_facility_capacities(self):
         return self.physical_network.get_mec_capacities()
+
+    def get_facility_max_capacities(self):
+        return self.physical_network.get_mec_max_capacities()
 
     def build_assignment_cost(self, sz, assignable_instances_N):
         assignment_cost = np.zeros(shape=(sz, self.physical_network.n_mec))
         for i, match in enumerate(assignable_instances_N):
             for j in range(self.physical_network.n_mec):
-                assignment_cost[i, j] = - match.compute_QoS(
+                assignment_cost[i, j] = 5 - match.compute_QoS(
                     max([self.physical_network.get_rtt(bs, j) for bs in match.get_base_stations()]))
         return assignment_cost
 

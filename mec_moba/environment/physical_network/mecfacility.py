@@ -4,9 +4,10 @@ from mec_moba.environment.matches import Game
 
 
 class MecFacility(object):
-    def __init__(self, facility_id, capacity):
+    def __init__(self, facility_id, capacity=8, max_capacity=12):
         self._facility_id = facility_id
         self._capacity = capacity
+        self._max_capacity = max_capacity
         self.deployed_matches = dict()
 
     def reset(self):
@@ -28,6 +29,10 @@ class MecFacility(object):
     @property
     def capacity(self):
         return self._capacity
+
+    @property
+    def max_capacity(self):
+        return self._max_capacity
 
     def get_facility_occupation(self, normalized=False):
         occupation = sum(match.get_resource_cost() for match in self.deployed_matches.values())
