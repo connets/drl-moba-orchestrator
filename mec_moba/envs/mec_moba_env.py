@@ -1,3 +1,5 @@
+import logging
+
 import gym
 import numpy as np
 from gym.spaces import Box, Discrete
@@ -26,7 +28,7 @@ class MecMobaDQNEvn(gym.Env):
             reward_weights = Environment.default_reward_weights()
 
         self._internal_env = Environment(reward_weights=reward_weights, gen_requests_until=gen_requests_until)
-
+        logging.info(f'State features number: {self._internal_env.get_time_slot_state_n_features()}')
         self.observation_space = Box(low=0.0, high=1.0, shape=(1, self._internal_env.get_time_slot_state_n_features()))
         self._actions_dict = MecMobaDQNEvn._create_action_space_map()
         self.action_space = Discrete(len(self._actions_dict))

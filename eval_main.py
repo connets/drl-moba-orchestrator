@@ -102,9 +102,9 @@ def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=100
                 obs = env.reset()
 
 
-seeds = [1000]
+seeds = [2000]
 
-reward_weights = (1, 2, 1)  # , 0, 0, 0)
+reward_weights = (1, 1, 1)  # , 0, 0, 0)
 
 state_columns = [f'qos_{i}' for i in range(6)]
 state_columns += [f'f_{i}' for i in range(7)]
@@ -122,7 +122,7 @@ for seed in seeds:
     rnd_agent = RandomAgent()
     run_test(seed, rnd_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
-    dqn_agent = DqnAgent(model_file='logs/rl_mlp_model_524160_steps.zip')
+    dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2021_12_29/8/saved_models/dqn_mlp_model_1300320_steps.zip')
 
     run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 

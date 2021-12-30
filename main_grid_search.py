@@ -16,12 +16,15 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from collections import namedtuple
 import itertools
 
+from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
 
-grid_search_params = ['learning_starts',
+grid_search_params = ['drl_algo',
+                      'learning_starts',
                       'buffer_size',
                       'target_update_interval',
                       'gamma',
+                      'exploration_fraction',
                       'exploration_final_eps',
                       'batch_size',
                       'learning_rate',
@@ -35,10 +38,12 @@ run_parameter_fields = run_parameter_fields_to_save + extra_run_parameter_fields
 sqlite_field_type_dict = {'run_id': 'text',
                           'train_epochs': 'integer',
                           'seed': 'integer',
+                          'drl_algo': 'text',
                           'learning_starts': 'integer',
                           'buffer_size': 'integer',
                           'target_update_interval': 'integer',
                           'gamma': 'real',
+                          'exploration_fraction': 'real',
                           'exploration_final_eps': 'real',
                           'batch_size': 'integer',
                           'learning_rate': 'real',
@@ -50,6 +55,12 @@ assert all(map(lambda k: k in sqlite_field_type_dict, run_parameter_fields_to_sa
 
 RunParameters = namedtuple('RunParameters', run_parameter_fields)
 
+# DRL ALGOs
+drl_algo = {'DQN': DQN,
+            'DDQN': DDQN}
+
+
+# DB
 
 def table_creation_utils(db_conn):
     cur = db_conn.cursor()
@@ -61,13 +72,14 @@ def table_creation_utils(db_conn):
 
 def insert_all_runs(db_conn, experiments):
     cur = db_conn.cursor()
+
     # print(f"insert into experiments ( {','.join(['?'] * len(sqlite_field_type_dict))})")
 
     def convert_if_str(k, v):
         return str(v) if sqlite_field_type_dict[k] == 'text' else v
 
     # experiments = (e._asdict() for e in experiments)
-    experiments = (tuple(convert_if_str(k,getattr(e, k)) for k in run_parameter_fields_to_save) for e in experiments)
+    experiments = (tuple(convert_if_str(k, getattr(e, k)) for k in run_parameter_fields_to_save) for e in experiments)
     cur.executemany(f"insert into experiments values ( {','.join(['?'] * len(sqlite_field_type_dict))})", experiments)
     db_conn.commit()
     cur.close()
@@ -83,22 +95,24 @@ def training_process(run_params: RunParameters):
     tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
 
     learn_weeks = run_params.train_epochs
-    save_freq_steps = 1008 * 10
+    save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path=model_save_dir,
                                              name_prefix='dqn_mlp_model')
 
-    model = DQN('MlpPolicy', env,
-                verbose=1,
-                learning_starts=run_params.learning_starts,
-                buffer_size=run_params.buffer_size,
-                target_update_interval=run_params.target_update_interval,
-                gamma=run_params.gamma,
-                exploration_final_eps=run_params.exploration_final_eps,
-                batch_size=run_params.batch_size,
-                train_freq=run_params.train_freq,
-                learning_rate=run_params.learning_rate,
-                tensorboard_log=tb_log_dir)
+    run_drl_algo = drl_algo[run_params.drl_algo]  # TODO: now it works with DQN and DDQN only
+    model = run_drl_algo('MlpPolicy', env,
+                         verbose=1,
+                         learning_starts=run_params.learning_starts,
+                         buffer_size=run_params.buffer_size,
+                         target_update_interval=run_params.target_update_interval,
+                         gamma=run_params.gamma,
+                         exploration_fraction=run_params.exploration_fraction,
+                         exploration_final_eps=run_params.exploration_final_eps,
+                         batch_size=run_params.batch_size,
+                         train_freq=run_params.train_freq,
+                         learning_rate=run_params.learning_rate,
+                         tensorboard_log=tb_log_dir)
 
     model.set_random_seed(run_params.seed)
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback, tb_log_name=run_params.run_id)

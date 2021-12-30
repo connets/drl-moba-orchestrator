@@ -13,6 +13,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
+from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
 
 
@@ -43,35 +44,37 @@ def main(cli_args):
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
-    learn_weeks = 52 * 10
+    learn_weeks = 52 * 100
     save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-                                             name_prefix='rl_mlp_model')
+                                             name_prefix='rl_mlp_model_2')
 
-    model = DQN('MlpPolicy', env,
-                verbose=1,
-                learning_starts=5_000,
-                buffer_size=100_000,
-                target_update_interval=2000,
-                exploration_fraction=0.1,
-                exploration_final_eps=0.02,
-                batch_size=64,
-                tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    model = DDQN('MlpPolicy', env,
+                 verbose=1,
+                 learning_starts=100,
+                 buffer_size=100_000,
+                 target_update_interval=2000,
+                 #tau=0.001,
+                 exploration_fraction=0.2,
+                 exploration_final_eps=0.02,
+                 batch_size=64,
+                 # policy_kwargs={'net_arch': [64,64,64]},
+                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
     #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
     model.set_random_seed(1000)
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 
-    obs = env.reset()
-    for i in range(1000):
-        action, _state = model.predict(obs, deterministic=True)
-        print(action)
-        obs, reward, done, info = env.step(action)
-        env.render()
-        if done:
-            obs = env.reset()
+    # obs = env.reset()
+    # for i in range(1000):
+    #     action, _state = model.predict(obs, deterministic=True)
+    #     print(action)
+    #     obs, reward, done, info = env.step(action)
+    #     env.render()
+    #     if done:
+    #         obs = env.reset()
 
 
 # Press the green button in the gutter to run the script.
