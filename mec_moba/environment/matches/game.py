@@ -23,7 +23,7 @@ class Game(object):
         self.group = group
         self.mec_facility_id: Optional[int] = None
         self.qos = -1  # error if it has never set
-
+        self.bs_set = frozenset([user.get_bs() for user in self.group])
         # masismo tmepo di attes
         self.max_wait = max_wait
         self.enqueue_time = None
@@ -60,7 +60,7 @@ class Game(object):
         return self.mec_facility_id
 
     def get_base_stations(self):
-        return [user.get_bs() for user in self.group]
+        return self.bs_set #[user.get_bs() for user in self.group]
 
     def enqueue(self, t_slot):
         self.enqueue_time = t_slot  # environment.get_env_absolute_t_slot_time()

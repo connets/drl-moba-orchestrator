@@ -14,7 +14,6 @@ from stable_baselines3 import DQN, PPO, TD3
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.noise import NormalActionNoise
 
-
 from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
 from mec_moba.envs.mec_moba_cont_act_env import MecMobaContinuosActionEvn
@@ -51,7 +50,7 @@ def main(cli_args):
     save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-                                             name_prefix='rl_mlp_model_2')
+                                             name_prefix='rl_mlp_model')
 
     # model = DDQN('MlpPolicy', env,
     #              verbose=1,
@@ -66,7 +65,11 @@ def main(cli_args):
     #              tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
     n_actions = env.action_space.shape[-1]
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
-    model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    model = TD3("MlpPolicy", env,
+                action_noise=action_noise,
+                buffer_size=100_000,
+                verbose=1,
+                tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
     #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")

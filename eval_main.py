@@ -140,49 +140,6 @@ for seed in seeds:
     rnd_agent = RandomAgent()
     run_test(seed, rnd_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
-    dqn_agent = TD3Agent(model_file='logs/rl_mlp_model_2_314496_steps.zip')
+    dqn_agent = TD3Agent(model_file='logs/rl_mlp_model_2_2253888_steps.zip')
 
-    run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
-
-    # reward_weights = (1, 2, 1, 0, 0, 0)
-    # env = MecMobaDQNEvn(reward_weights=reward_weights, log_match_data=True, base_log_dir=f'logs/{seed}/match_logs')
-    # env = Monitor(env)
-    # env = FlattenObservation(env)
-    # # check_env(env, warn=True)
-
-    # MODIFICA PATH!!!!
-    # model = DQN.load("out/dqn_icdcs22_2021_12_18_rw_param/2/saved_models/dqn_mlp_model_1048320_steps")
-    # model.set_env(env)
-    # mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=5, deterministic=True)
-    # model.set_random_seed(seed)
-
-    # (self.running_qos_prob + self.facility_utilization +
-    # [self.queue_occupation, self.mean_queue_waiting_time, self.mean_running_time, self.migrable_ratio, self.queue_drop_rate])
-    # with open(f'logs/{seed}/eval_test.csv', 'w') as f:
-    #     f.write(f"{','.join(head_line)}\n")
-    #     t_slot = 0
-    #     week = 0
-    #     obs = env.reset()
-    #     for i in range(1008 * 1):
-    #         action, _ = model.predict(obs, deterministic=True)
-    #         obs_pre = obs
-    #         # print(env.action_id_to_human(action))
-    #         obs, reward, done, info = env.step(action)
-    #
-    #         # LOG
-    #         args_to_write = [str(week), str(t_slot)]
-    #         args_to_write += [str(i) for i in obs_pre]
-    #         args_to_write += list(str(env.action_id_to_human(action))[1:-1].split(','))
-    #         args_to_write += [str(i) for i in obs]
-    #         args_to_write.append(str(reward))
-    #         f.write(f"{','.join(args_to_write)}\n")
-    #
-    #         # env.render()
-    #         t_slot += 1
-    #         if done:
-    #             print('week ends')
-    #             week += 1
-    #             t_slot = 0
-    #             obs = env.reset()
-
-# print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
+    run_test(seed, dqn_agent, t_slot_to_test=144*2)#, gen_requests_until=None)

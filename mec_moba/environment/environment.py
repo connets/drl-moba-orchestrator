@@ -96,7 +96,7 @@ def load_balancing_reward_cmp(environment, action: DqnAction, act_res_inst: Acti
 
 
 def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: ActionResultsInstructions):
-    return - action.over_provisioning_value / 100
+    return - action.over_provisioning_value/100
     # if action.is_no_action():
     #     return 0
     #
