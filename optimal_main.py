@@ -97,10 +97,10 @@ m.addConstrs(((x[i, j, t + 1] - x[i, j, t] <= y[i, t]) for i in range(N) for j i
              name='c2')
 
 #
-m.addConstrs(((sum([x[i, j, t] for i in range(N)]) <= 8 + v[j, t]) for j in range(F) for t in range(T)),
+m.addConstrs(((sum([x[i, j, t] for i in range(N)]) <= v[j, t]) for j in range(F) for t in range(T)),
              name='c3')
 
-m.addConstrs(((v[j, t] <= 4) for j in range(F) for t in range(T)),
+m.addConstrs(((v[j, t] <= 12) for j in range(F) for t in range(T)),
              name='c4')
 
 m.update()

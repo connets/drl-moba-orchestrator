@@ -172,6 +172,10 @@ def do_action(action, environment) -> ActionResultsInstructions:
     old_f = [i.get_facility_id() for i in selected_instancies]
     op_costs = [1] * n_mec
 
+    if len(selected_instancies) == 0 and len(instances_deploy) == 0:
+        return ActionResultsInstructions(num_facilities=environment.physical_network.n_mec)
+
+
     x = _create_and_solve_opt_model(assignment_cost, [1] * n_mec, gamma,
                                     environment.get_facility_capacities(),
                                     environment.get_facility_max_capacities(),

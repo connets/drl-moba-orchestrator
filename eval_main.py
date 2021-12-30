@@ -1,7 +1,7 @@
 import abc
 import os
 from time import time
-
+import numpy as np
 import gym
 
 # This is a sample Python script.
@@ -11,11 +11,12 @@ import gym
 from gym.utils.env_checker import check_env
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3 import DQN
+from stable_baselines3 import DQN, TD3
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 
 from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.envs.mec_moba_cont_act_env import MecMobaContinuosActionEvn
 
 
 class TestAgent:
@@ -52,6 +53,23 @@ class DqnAgent(TestAgent):
         return action
 
 
+class TD3Agent(TestAgent):
+    def __init__(self, model_file):
+        super().__init__()
+        self.model = TD3.load(model_file)
+
+    def policy_type(self) -> str:
+        return 'td3'
+
+    def set_env_seed(self, env_obj, seed):
+        self.model.set_env(env_obj)
+        self.model.set_random_seed(seed)
+
+    def select_action(self, observation, env_obj: gym.Env):
+        action, _ = self.model.predict(observation, deterministic=True)
+        return action
+
+
 class RandomAgent(TestAgent):
 
     def policy_type(self) -> str:
@@ -61,14 +79,14 @@ class RandomAgent(TestAgent):
         env_obj.seed(seed)
 
     def select_action(self, observation, env_obj: gym.Env):
-        return env_obj.action_space.sample()
+        return np.random.random(3)
 
 
 def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=1008):
-    env = MecMobaDQNEvn(reward_weights=reward_weights,
-                        gen_requests_until=gen_requests_until,
-                        log_match_data=True,
-                        base_log_dir=f'logs/{seed}/match_logs_{agent.policy_type()}')
+    env = MecMobaContinuosActionEvn(reward_weights=reward_weights,
+                                    gen_requests_until=gen_requests_until,
+                                    log_match_data=True,
+                                    base_log_dir=f'logs/{seed}/match_logs_{agent.policy_type()}')
     env = Monitor(env)
     env = FlattenObservation(env)
 
@@ -88,7 +106,7 @@ def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=100
             # LOG
             args_to_write = [str(week), str(t_slot)]
             args_to_write += [str(i) for i in obs_pre]
-            args_to_write += list(str(env.action_id_to_human(action))[1:-1].split(','))
+            args_to_write += ["0"] + [str(a) for a in action]  # _id_to_human(action))[1:-1].split(','))
             args_to_write += [str(i) for i in obs]
             args_to_write.append(str(reward))
             f.write(f"{','.join(args_to_write)}\n")
@@ -122,7 +140,7 @@ for seed in seeds:
     rnd_agent = RandomAgent()
     run_test(seed, rnd_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
-    dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2021_12_29/8/saved_models/dqn_mlp_model_1300320_steps.zip')
+    dqn_agent = TD3Agent(model_file='logs/rl_mlp_model_2_314496_steps.zip')
 
     run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 

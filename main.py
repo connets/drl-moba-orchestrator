@@ -2,7 +2,7 @@ import os
 from time import time
 
 import argparse
-
+import numpy as np
 # This is a sample Python script.
 
 # Press Shift+F10 to execute it or replace it with your code.
@@ -10,11 +10,14 @@ import argparse
 from gym.utils.env_checker import check_env
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3 import DQN, PPO
+from stable_baselines3 import DQN, PPO, TD3
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+from stable_baselines3.common.noise import NormalActionNoise
+
 
 from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.envs.mec_moba_cont_act_env import MecMobaContinuosActionEvn
 
 
 def parse_cli_args():
@@ -40,7 +43,7 @@ def main(cli_args):
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaDQNEvn(reward_weights=(1, 2, 1))
+    env = MecMobaContinuosActionEvn(reward_weights=(1, 1, 1))
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
@@ -50,17 +53,20 @@ def main(cli_args):
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
                                              name_prefix='rl_mlp_model_2')
 
-    model = DDQN('MlpPolicy', env,
-                 verbose=1,
-                 learning_starts=100,
-                 buffer_size=100_000,
-                 target_update_interval=2000,
-                 #tau=0.001,
-                 exploration_fraction=0.2,
-                 exploration_final_eps=0.02,
-                 batch_size=64,
-                 # policy_kwargs={'net_arch': [64,64,64]},
-                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    # model = DDQN('MlpPolicy', env,
+    #              verbose=1,
+    #              learning_starts=100,
+    #              buffer_size=100_000,
+    #              target_update_interval=2000,
+    #              #tau=0.001,
+    #              exploration_fraction=0.7,
+    #              exploration_final_eps=0.02,
+    #              batch_size=256,
+    #              policy_kwargs={'net_arch': [64,64,64]},
+    #              tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    n_actions = env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+    model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=1, tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
     #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
