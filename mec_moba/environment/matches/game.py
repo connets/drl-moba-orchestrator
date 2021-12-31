@@ -115,7 +115,7 @@ class Game(object):
     #     self.QoS = self.compute_QoS(rtt)
 
     def compute_QoS(self, rtt_ms):
-        return 5 - min(int(rtt_ms / 10), 5)
+        return 5 - int(rtt_ms / 10) # NOTE rtt_ms should be <60 ms !!
         # fps = round(1000 / rtt_ms)
         # fps_qos = Game._qos_levels[self.game_type]
         # qos = next(itertools.dropwhile(lambda e: e[0] < fps, fps_qos))[1]

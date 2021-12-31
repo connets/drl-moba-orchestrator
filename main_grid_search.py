@@ -3,6 +3,8 @@ from time import time
 import sqlite3
 
 import argparse
+
+import numpy as np
 import yaml
 from multiprocessing import Pool
 
@@ -11,24 +13,24 @@ from multiprocessing import Pool
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 from gym.wrappers import FlattenObservation
-from stable_baselines3 import DQN, PPO
+from stable_baselines3 import DQN, PPO, TD3
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from collections import namedtuple
 import itertools
 
+from stable_baselines3.common.noise import NormalActionNoise
+
 from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.envs.mec_moba_cont_act_env import MecMobaContinuosActionEvn
 
 grid_search_params = ['drl_algo',
                       'learning_starts',
                       'buffer_size',
-                      'target_update_interval',
-                      'gamma',
-                      'exploration_fraction',
-                      'exploration_final_eps',
                       'batch_size',
                       'learning_rate',
-                      'train_freq',
+                      'action_noise_sigma',
+                      'mlp_arch',
                       'reward_weights']
 
 run_parameter_fields_to_save = ['run_id', 'train_epochs', 'seed'] + grid_search_params
@@ -41,13 +43,10 @@ sqlite_field_type_dict = {'run_id': 'text',
                           'drl_algo': 'text',
                           'learning_starts': 'integer',
                           'buffer_size': 'integer',
-                          'target_update_interval': 'integer',
-                          'gamma': 'real',
-                          'exploration_fraction': 'real',
-                          'exploration_final_eps': 'real',
                           'batch_size': 'integer',
                           'learning_rate': 'real',
-                          'train_freq': 'integer',
+                          'action_noise_sigma': 'real',
+                          'mlp_arch': 'text',
                           'reward_weights': 'text'
                           }
 
@@ -57,7 +56,8 @@ RunParameters = namedtuple('RunParameters', run_parameter_fields)
 
 # DRL ALGOs
 drl_algo = {'DQN': DQN,
-            'DDQN': DDQN}
+            'DDQN': DDQN,
+            'TD3': TD3}
 
 
 # DB
@@ -86,7 +86,7 @@ def insert_all_runs(db_conn, experiments):
 
 
 def training_process(run_params: RunParameters):
-    env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+    env = MecMobaContinuosActionEvn(run_params.reward_weights, normalize_reward=True)
     env = FlattenObservation(env)
     # check_env(env, warn=True)
     model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
@@ -98,24 +98,45 @@ def training_process(run_params: RunParameters):
     save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path=model_save_dir,
-                                             name_prefix='dqn_mlp_model')
+                                             name_prefix='td3_mlp_model')
 
-    run_drl_algo = drl_algo[run_params.drl_algo]  # TODO: now it works with DQN and DDQN only
-    model = run_drl_algo('MlpPolicy', env,
-                         verbose=1,
-                         learning_starts=run_params.learning_starts,
-                         buffer_size=run_params.buffer_size,
-                         target_update_interval=run_params.target_update_interval,
-                         gamma=run_params.gamma,
-                         exploration_fraction=run_params.exploration_fraction,
-                         exploration_final_eps=run_params.exploration_final_eps,
-                         batch_size=run_params.batch_size,
-                         train_freq=run_params.train_freq,
-                         learning_rate=run_params.learning_rate,
-                         tensorboard_log=tb_log_dir)
+    # run_drl_algo = drl_algo[run_params.drl_algo]  # TODO: now it works with DQN and DDQN only
+
+    n_actions = env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=run_params.action_noise_sigma * np.ones(n_actions))
+    model = TD3('MlpPolicy', env, verbose=1,
+                action_noise=action_noise,
+                learning_starts=run_params.learning_starts,
+                buffer_size=run_params.buffer_size,
+                batch_size=run_params.batch_size,
+                learning_rate=run_params.learning_rate,
+                policy_kwargs={'net_arch': run_params.mlp_arch},
+                tensorboard_log=tb_log_dir)
+    # action_noise = action_noise,
+    # buffer_size = 100_000,
+    # batch_size = 500,
+    # learning_starts = 1000,
+    # learning_rate = 1e-4,
+    # verbose = 1,
+    # policy_kwargs = {'net_arch': [64, 32, 16]},
+    # tensorboard_log = "./tb_log/dqn_mec_moba_tensorboard/")
+
+    # model = run_drl_algo('MlpPolicy', env,
+    #                      verbose=1,
+    #                      learning_starts=run_params.learning_starts,
+    #                      ,
+    #                      target_update_interval=run_params.target_update_interval,
+    #                      gamma=run_params.gamma,
+    #                      exploration_fraction=run_params.exploration_fraction,
+    #                      exploration_final_eps=run_params.exploration_final_eps,
+    #
+    #                      train_freq=run_params.train_freq,
+    #                      learning_rate=run_params.learning_rate,
+    #                      tensorboard_log=tb_log_dir)
 
     model.set_random_seed(run_params.seed)
     model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback, tb_log_name=run_params.run_id)
+    model.s
 
 
 def _generate_run_parameter(run_id, base_dir, train_epochs, seed, grid_params_dict):
@@ -130,7 +151,8 @@ def main():
     parser.add_argument('conf_file', type=str, help='Grid search configurator file (.yaml)')
     parser.add_argument('experiment_tag', type=str, help='A name of this experiment setting')
     parser.add_argument('--seed', type=int, default=-1, help="Seed number. -1 or negative values means random seed ")
-    parser.add_argument('-j', type=int, default=os.cpu_count() - 1, help='Number of parallel processes', dest='num_processes')
+    parser.add_argument('-j', type=int, default=os.cpu_count() - 1, help='Number of parallel processes',
+                        dest='num_processes')
     parser.add_argument('--train-epochs', type=int, default=52 * 10, help="Number of training weeks")
     cli_args = parser.parse_args()
 
@@ -139,7 +161,7 @@ def main():
         raise RuntimeError('experiment_tag argument must not contain spaces')
 
     base_dir = os.path.join('out', cli_args.experiment_tag)
-    os.makedirs(os.path.join(base_dir, 'dqn_mec_moba_tensorboard'), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, 'td3_mec_moba_tensorboard'), exist_ok=True)
     # Create DB
     db_connection = sqlite3.connect(os.path.join('out', cli_args.experiment_tag, 'experiments.db'))
     table_creation_utils(db_connection)

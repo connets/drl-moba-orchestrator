@@ -59,12 +59,14 @@ class TimeSlotSnapshot:
     # @property
     def to_array(self) -> Sized:
         a = np.array(self.running_qos_prob + self.facility_utilization +
-                     [self.queue_occupation, self.mean_queue_waiting_time, self.mean_running_time, self.migrable_ratio, self.queue_drop_rate])
+                     [self.queue_occupation, self.mean_queue_waiting_time, self.mean_running_time, self.migrable_ratio,
+                      self.queue_drop_rate])
         return a[np.newaxis, :]
 
     def to_log_format(self):
         to_log = self.running_qos_prob + self.facility_utilization
-        to_log += [self.queue_occupation, self.mean_queue_waiting_time, self.mean_running_time, self.migrable_ratio, self.queue_drop_rate]
+        to_log += [self.queue_occupation, self.mean_queue_waiting_time, self.mean_running_time, self.migrable_ratio,
+                   self.queue_drop_rate]
         return to_log
 
     # ----------------------------------
@@ -78,7 +80,8 @@ def _queue_occupation_reward_cmp(environment, action: DqnAction, act_res_inst: A
     if action.is_no_action():
         if sum(facility_occ) == 0 and len(environment.match_controller.queue) == 0:
             return 0
-        if len(environment.match_controller.queue) > 0 and sum(facility_occ) < 1.2 * environment.physical_network.n_mec:  # TODO remove hardcoded
+        if len(environment.match_controller.queue) > 0 and sum(
+                facility_occ) < 1.2 * environment.physical_network.n_mec:  # TODO remove hardcoded
             queue_rew_factor = (1.2 * environment.physical_network.n_mec) / max(sum(facility_occ), 1)
 
     return - queue_rew_factor * environment.match_controller.get_queue_occupation_state()
@@ -96,7 +99,7 @@ def load_balancing_reward_cmp(environment, action: DqnAction, act_res_inst: Acti
 
 
 def overprovisioning_reward_cmp(environment, action: DqnAction, act_res_inst: ActionResultsInstructions):
-    return - action.over_provisioning_value/100
+    return - action.over_provisioning_value / 100
     # if action.is_no_action():
     #     return 0
     #
@@ -164,13 +167,13 @@ class Environment:
     def default_reward_weights():
         return tuple([1] * len(reward_comp_order))
 
-    def __init__(self, reward_weights, gen_requests_until=None):
+    def __init__(self, reward_weights, gen_requests_until=None, normalize_reward=True):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
         self.match_generator = GameGenerator(gen_requests_until)
         self.reward_weights = reward_weights
         # self.gen_requests_until = gen_requests_until
-
+        self.normalize_reward = normalize_reward
         self.validate_action_enabled = False  # get_config_value(Environment.get_module_config_name(), VALIDATE_ACTION_PARAM)
 
         self._epoch_t_slot = 0
@@ -193,7 +196,8 @@ class Environment:
 
     def _read_and_set_observable_state(self):
         self.t_slot_state = TimeSlotSnapshot(running_qos_prob=self.match_controller.get_qos_state(),
-                                             facility_utilization=self.physical_network.get_all_facilities_occupation(normalized=True),
+                                             facility_utilization=self.physical_network.get_all_facilities_occupation(
+                                                 normalized=True),
                                              queue_occupation=self.match_controller.get_queue_occupation_state(),
                                              mean_queue_waiting_time=self.match_controller.get_mean_queue_waiting_time(),
                                              mean_running_time=self.match_controller.get_mean_running_time_state(),
@@ -213,7 +217,8 @@ class Environment:
     def get_time_slot_state_n_features(self):
         return self.get_time_slot_state().num_features
 
-    def compute_reward(self, action: DqnAction, action_res_inst: ActionResultsInstructions):  # migrations, capacity_val, op_val, ):
+    def compute_reward(self, action: DqnAction,
+                       action_res_inst: ActionResultsInstructions):  # migrations, capacity_val, op_val, ):
         if action_res_inst.is_feasible:
             # each split reward component is to have max value = 0
             split_rewards = [reward_comp[rw_cmp][0](self, action, action_res_inst) for rw_cmp in reward_comp_order]
@@ -223,9 +228,12 @@ class Environment:
 
         split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights) if v is not None]
 
-        worst_value_sum = abs(sum(w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
+        worst_value_sum = abs(sum(
+            w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
         # reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
-        reward = sum(split_rewards) / len(split_rewards)
+        reward = sum(split_rewards)
+        if self.normalize_reward:
+            reward /= worst_value_sum
         return reward, split_rewards
 
     def inc_timeslot(self) -> bool:
@@ -269,7 +277,7 @@ class Environment:
         for i, match in enumerate(assignable_instances_N):
             for j in range(self.physical_network.n_mec):
                 assignment_cost[i, j] = 5 - match.compute_QoS(
-                    max([self.physical_network.get_rtt(bs, j) for bs in match.get_base_stations()]))
+                    max(self.physical_network.get_rtt(bs, j) for bs in match.get_base_stations()))
         return assignment_cost
 
     def get_migrate_list(self, migrate_val):

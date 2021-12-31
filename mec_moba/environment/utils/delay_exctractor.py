@@ -6,7 +6,7 @@ allowed_facilities = {5, 16, 17, 19, 25, 30, 31}
 
 
 def extract_delay():
-    df = pandas.read_csv('data/BS_Facility_delay_NEW_bh_30.csv.gz')
+    df = pandas.read_csv('data/BS_Facility_delay_NEW_bh_30_NUMERIC.csv.gz')
     df = df[df.facility.isin(allowed_facilities)]
 
     # re-number facilities id

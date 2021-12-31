@@ -42,7 +42,7 @@ def main(cli_args):
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaContinuosActionEvn(reward_weights=(1, 1, 1))
+    env = MecMobaContinuosActionEvn(reward_weights=(0.5, 0.5, 1), normalize_reward=True)
     env = FlattenObservation(env)
     # check_env(env, warn=True)
 
@@ -50,7 +50,7 @@ def main(cli_args):
     save_freq_steps = 1008 * 52
 
     checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-                                             name_prefix='rl_mlp_model')
+                                             name_prefix='rl_mlp_model_test')
 
     # model = DDQN('MlpPolicy', env,
     #              verbose=1,
@@ -68,7 +68,11 @@ def main(cli_args):
     model = TD3("MlpPolicy", env,
                 action_noise=action_noise,
                 buffer_size=100_000,
+                batch_size=500,
+                learning_starts=1000,
+                learning_rate=1e-4,
                 verbose=1,
+                policy_kwargs={'net_arch': [64, 32, 16]},
                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,

@@ -22,16 +22,20 @@ class MecMobaContinuosActionEvn(gym.Env):
     #     actions = filter(lambda a: a[2] + a[3] > 0, actions)
     #     return {a_id: DqnAction(*a) for a_id, a in enumerate(actions)}
 
-    def __init__(self, reward_weights=None, gen_requests_until=None, log_match_data=False, base_log_dir=None):
+    def __init__(self, reward_weights=None, gen_requests_until=None,
+                 normalize_reward=True,
+                 log_match_data=False, base_log_dir=None):
         super(MecMobaContinuosActionEvn, self).__init__()
         if reward_weights is None:
             reward_weights = Environment.default_reward_weights()
 
-        self._internal_env = Environment(reward_weights=reward_weights, gen_requests_until=gen_requests_until)
+        self._internal_env = Environment(reward_weights=reward_weights, gen_requests_until=gen_requests_until,
+                                         normalize_reward=normalize_reward)
         logging.info(f'State features number: {self._internal_env.get_time_slot_state_n_features()}')
-        self.observation_space = Box(low=0.0, high=1.0, shape=(1, self._internal_env.get_time_slot_state_n_features()))
+        self.observation_space = Box(low=0.0, high=1.0, shape=(1, self._internal_env.get_time_slot_state_n_features()),
+                                     dtype=np.float32)
         # self._actions_dict = MecMobaDQNEvn._create_action_space_map()
-        self.action_space = Box(low=np.array([0.0]*3), high=np.array([1.0]*3))
+        self.action_space = Box(low=np.array([0.0] * 3), high=np.array([1.0] * 3), dtype=np.float32)
 
         # self.state_obs = self._initial_observation()
         self.t_slot = 0

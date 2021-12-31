@@ -136,7 +136,7 @@ def _create_and_solve_opt_model(cost_c, cost_r, gamma, facility_cap, facility_ma
         #     to_debug += [a * facility_cap[fac], U[fac], b * facility_cap[fac], None]
         return None
     else:
-        x_ret = [[abs(x.tolist()[i][j].x) for j in range(F)] for i in range(N)]
+        x_ret = [[abs(x[i][j].x) for j in range(F)] for i in range(N)]
         # v_ret = [abs(j.x) for j in v.tolist()]
         # for fac in range(F):
         #     to_debug += [a * facility_cap[fac], U[fac], b * facility_cap[fac], v_ret[fac]]
@@ -173,7 +173,7 @@ def do_action(action, environment) -> ActionResultsInstructions:
     op_costs = [1] * n_mec
 
     if len(selected_instancies) == 0 and len(instances_deploy) == 0:
-        return ActionResultsInstructions(num_facilities=environment.physical_network.n_mec)
+        return ActionResultsInstructions(num_facilities=environment.physical_network.n_mec,  is_feasible=False)
 
 
     x = _create_and_solve_opt_model(assignment_cost, [1] * n_mec, gamma,

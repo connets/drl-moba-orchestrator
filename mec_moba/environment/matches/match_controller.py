@@ -47,8 +47,8 @@ class MatchController:
             for j in range(self.physical_net_ctl.n_mec):
                 # >= perchè in casi di sovraffollamento di una mec e le altre vuote potrebbe aver senso migrare
                 # per distribuire il peso
-                if min([match.compute_QoS(self.physical_net_ctl.get_rtt(bs, j)) for bs in
-                        match.get_base_stations()]) > current_qos and j != match.get_facility_id():
+                if min(match.compute_QoS(self.physical_net_ctl.get_rtt(bs, j)) for bs in
+                        match.get_base_stations()) > current_qos and j != match.get_facility_id():
                     migrable_vnf.append(match)
                     break
 
@@ -79,7 +79,7 @@ class MatchController:
         match.migrate(new_facility_id, new_rtt)
 
     def _get_match_facility_rtt(self, match, facility_id):
-        return max([self.physical_net_ctl.get_rtt(k, facility_id) for k in match.get_base_stations()])
+        return max(self.physical_net_ctl.get_rtt(k, facility_id) for k in match.get_base_stations())
 
     def update_qos(self):
         for game in self.running:

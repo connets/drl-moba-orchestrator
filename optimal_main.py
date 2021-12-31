@@ -63,8 +63,8 @@ for n in range(N):
 # Create a new model
 m = gp.Model("DQN")
 m.Params.LogToConsole = 1
-m.Params.MIPGap = 0.001
-m.Params.TimeLimit = 3000
+m.Params.MIPGap = 0.005
+m.Params.TimeLimit = 4*3600
 
 # Create variables
 x = m.addMVar((N, F, T), vtype=gp.GRB.BINARY, name="X")

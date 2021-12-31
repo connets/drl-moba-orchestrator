@@ -82,10 +82,11 @@ class RandomAgent(TestAgent):
         return np.random.random(3)
 
 
-def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=1008):
+def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=1008, normalize_reward=True):
     env = MecMobaContinuosActionEvn(reward_weights=reward_weights,
                                     gen_requests_until=gen_requests_until,
                                     log_match_data=True,
+                                    normalize_reward=normalize_reward,
                                     base_log_dir=f'logs/{seed}/match_logs_{agent.policy_type()}')
     env = Monitor(env)
     env = FlattenObservation(env)
@@ -120,9 +121,9 @@ def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=100
                 obs = env.reset()
 
 
-seeds = [2000]
+seeds = [1000,2000]
 
-reward_weights = (1, 1, 1)  # , 0, 0, 0)
+  # , 0, 0, 0)
 
 state_columns = [f'qos_{i}' for i in range(6)]
 state_columns += [f'f_{i}' for i in range(7)]
@@ -136,10 +137,11 @@ head_line += next_state_columns + ['reward']
 
 for seed in seeds:
     os.makedirs(f'logs/{seed}', exist_ok=True)
-
+    reward_weights = (1, 1, 1)
+    reward_weights = (.5, .5, 1)
     rnd_agent = RandomAgent()
     run_test(seed, rnd_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
-    dqn_agent = TD3Agent(model_file='logs/rl_mlp_model_2_2253888_steps.zip')
+    dqn_agent = TD3Agent(model_file='logs/rl_mlp_model_2_943488_steps.zip')
 
-    run_test(seed, dqn_agent, t_slot_to_test=144*2)#, gen_requests_until=None)
+    run_test(seed, dqn_agent, t_slot_to_test=144*2,normalize_reward=True)#, gen_requests_until=None)
