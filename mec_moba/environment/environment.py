@@ -164,13 +164,13 @@ class Environment:
     def default_reward_weights():
         return tuple([1] * len(reward_comp_order))
 
-    def __init__(self, reward_weights, gen_requests_until=None):
+    def __init__(self, reward_weights, gen_requests_until=None, normalize_reward=True):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
         self.match_generator = GameGenerator(gen_requests_until)
         self.reward_weights = reward_weights
         # self.gen_requests_until = gen_requests_until
-
+        self.normalize_reward= normalize_reward
         self.validate_action_enabled = False  # get_config_value(Environment.get_module_config_name(), VALIDATE_ACTION_PARAM)
 
         self._epoch_t_slot = 0
@@ -223,10 +223,14 @@ class Environment:
 
         split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights) if v is not None]
 
-        worst_value_sum = abs(sum(w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
+        worst_value_sum = abs(sum(
+            w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
         # reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
-        reward = sum(split_rewards) / len(split_rewards)
+        reward = sum(split_rewards)
+        if self.normalize_reward:
+            reward /= worst_value_sum
         return reward, split_rewards
+
 
     def inc_timeslot(self) -> bool:
         # print('running matches', len(self.match_controller.running))

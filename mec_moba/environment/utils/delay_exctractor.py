@@ -49,6 +49,4 @@ def extract_delay():
     ret_dict = {'n_bs': n_bs,
                 'n_mec': n_mec,
                 'delays': delay_dict}
-    file = open('data/delay_dict.pkl', 'wb')
-    pickle.dump(ret_dict, file)
-    file.close()
+    return ret_dict

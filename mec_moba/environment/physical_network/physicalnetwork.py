@@ -19,9 +19,7 @@ class PhysicalNetwork:
     def __init__(self, environment: Environment):
         self.environment = environment
         self.mec_op = 0
-        if not os.path.isfile('data/delay_dict.pkl'):
-            extract_delay()
-        info_physical_net = pickle.load(open('data/delay_dict.pkl', 'rb'))
+        info_physical_net = extract_delay()
         self.delay_dict = info_physical_net['delays']
 
         self.n_bs, self.n_mec = info_physical_net['n_bs'], info_physical_net['n_mec']
