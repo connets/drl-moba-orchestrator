@@ -7,14 +7,36 @@ import argparse
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-from gym.utils.env_checker import check_env
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
-from mec_moba.drlalgo.ddqn import DDQN
 from mec_moba.envs import MecMobaDQNEvn
+
+import torch, numpy as np
+from torch import nn
+import tianshou as ts
+
+class Net(nn.Module):
+    def __init__(self, state_shape, action_shape):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(np.prod(state_shape), 128), nn.ReLU(inplace=True),
+            nn.Linear(128, 128), nn.ReLU(inplace=True),
+            nn.Linear(128, 128), nn.ReLU(inplace=True),
+            nn.Linear(128, np.prod(action_shape)),
+        )
+
+    def forward(self, obs, state=None, info={}):
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype=torch.float)
+        batch = obs.shape[0]
+        logits = self.model(obs.view(batch, -1))
+        return logits, state
+
+
+
 
 
 def parse_cli_args():
@@ -40,27 +62,55 @@ def main(cli_args):
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaDQNEvn(reward_weights=(1, 2, 1))
+    env = MecMobaDQNEvn(reward_weights=(0.25, 0.5, 1))
     env = FlattenObservation(env)
+
+    test_env = MecMobaDQNEvn(reward_weights=(0.25, 0.5, 1))
+    test_env = FlattenObservation(test_env)
     # check_env(env, warn=True)
 
     learn_weeks = 52 * 100
     save_freq_steps = 1008 * 52
 
-    checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-                                             name_prefix='rl_mlp_model_2')
+    # checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
+    #                                          name_prefix='rl_mlp_model_2')
 
-    model = DDQN('MlpPolicy', env,
-                 verbose=1,
-                 learning_starts=100,
-                 buffer_size=100_000,
-                 target_update_interval=2000,
-                 #tau=0.001,
-                 exploration_fraction=0.2,
-                 exploration_final_eps=0.02,
-                 batch_size=64,
-                 # policy_kwargs={'net_arch': [64,64,64]},
-                 tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
+    state_shape = env.observation_space.shape or env.observation_space.n
+    action_shape = env.action_space.shape or env.action_space.n
+    net = Net(state_shape, action_shape)
+    optim = torch.optim.Adam(net.parameters(), lr=1e-4)
+
+    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.9, estimation_step=1, target_update_freq=2000)
+
+    train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2), exploration_noise=True)
+    test_collector = ts.data.Collector(policy, test_env, exploration_noise=True)
+
+    from torch.utils.tensorboard import SummaryWriter
+    from tianshou.utils import TensorboardLogger
+    writer = SummaryWriter('logs/dqn')
+    logger = TensorboardLogger(writer)
+
+    result = ts.trainer.offpolicy_trainer(
+        policy, train_collector, test_collector,
+        max_epoch=52*10, step_per_epoch=1008, step_per_collect=10,
+        update_per_step=1, episode_per_test=1, batch_size=64,
+        train_fn=lambda epoch, env_step: policy.set_eps(0.1),
+        test_fn=lambda epoch, env_step: policy.set_eps(0.05),
+        stop_fn=lambda mean_rewards: mean_rewards >= -200,
+        logger=logger)
+    print(f'Finished training! Use {result["duration"]}')
+
+    # model = DDQN('MlpPolicy', env,
+    #              verbose=1,
+    #              learning_starts=100,
+    #              buffer_size=100_000,
+    #              target_update_interval=2000,
+    #              #tau=0.001,
+    #              exploration_fraction=0.2,
+    #              exploration_final_eps=0.02,
+    #              batch_size=64,
+    #              # policy_kwargs={'net_arch': [64,64,64]},
+    #              tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
     #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
