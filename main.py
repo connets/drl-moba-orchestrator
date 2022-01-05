@@ -14,7 +14,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 
 from mec_moba.envs import MecMobaDQNEvn
 
-import torch, numpy as np
+import torch, math, numpy as np
 from torch import nn
 import tianshou as ts
 
@@ -22,11 +22,12 @@ import tianshou as ts
 class Net(nn.Module):
     def __init__(self, state_shape, action_shape):
         super().__init__()
+        layer_dim = pow(2, math.floor(math.log2(max(18,120))))
         self.model = nn.Sequential(
-            nn.Linear(np.prod(state_shape), 128), nn.ReLU(inplace=True),
-            nn.Linear(128, 128), nn.ReLU(inplace=True),
-            nn.Linear(128, 128), nn.ReLU(inplace=True),
-            nn.Linear(128, np.prod(action_shape)),
+            nn.Linear(np.prod(state_shape), layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, np.prod(action_shape)),
         )
 
     def forward(self, obs, state=None, info={}):
@@ -86,7 +87,7 @@ def main(cli_args):
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
-    logdir = 'logs/dqn2'
+    logdir = 'logs/dqn'
     writer = SummaryWriter(logdir)
     logger = TensorboardLogger(writer)
 
@@ -119,8 +120,6 @@ def main(cli_args):
 
     # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
     #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
-    model.set_random_seed(1000)
-    model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback)
 
     # obs = env.reset()
     # for i in range(1000):
