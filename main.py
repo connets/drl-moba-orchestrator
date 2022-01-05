@@ -18,6 +18,7 @@ import torch, numpy as np
 from torch import nn
 import tianshou as ts
 
+
 class Net(nn.Module):
     def __init__(self, state_shape, action_shape):
         super().__init__()
@@ -34,9 +35,6 @@ class Net(nn.Module):
         batch = obs.shape[0]
         logits = self.model(obs.view(batch, -1))
         return logits, state
-
-
-
 
 
 def parse_cli_args():
@@ -72,8 +70,8 @@ def main(cli_args):
     learn_weeks = 52 * 100
     save_freq_steps = 1008 * 52
 
-    # checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-    #                                          name_prefix='rl_mlp_model_2')
+    checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
+                                             name_prefix='rl_mlp_model_2')
 
     state_shape = env.observation_space.shape or env.observation_space.n
     action_shape = env.action_space.shape or env.action_space.n
@@ -82,21 +80,28 @@ def main(cli_args):
 
     policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.9, estimation_step=1, target_update_freq=2000)
 
-    train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2), exploration_noise=True)
+    train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2),
+                                        exploration_noise=True)
     test_collector = ts.data.Collector(policy, test_env, exploration_noise=True)
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
-    writer = SummaryWriter('logs/dqn')
+    logdir = 'logs/dqn2'
+    writer = SummaryWriter(logdir)
     logger = TensorboardLogger(writer)
+
+    def save_policy_fn(policy_obj):
+        print('saving policy')
+        torch.save(policy_obj.state_dict(), f'{logdir}/dqn.pth')
 
     result = ts.trainer.offpolicy_trainer(
         policy, train_collector, test_collector,
-        max_epoch=52*10, step_per_epoch=1008, step_per_collect=10,
-        update_per_step=1, episode_per_test=1, batch_size=64,
+        max_epoch=52 * 20, step_per_epoch=1008, step_per_collect=1,
+        update_per_step=4, episode_per_test=10, batch_size=64,
         train_fn=lambda epoch, env_step: policy.set_eps(0.1),
-        test_fn=lambda epoch, env_step: policy.set_eps(0.05),
+        test_fn=lambda epoch, env_step: policy.set_eps(0),
         stop_fn=lambda mean_rewards: mean_rewards >= -200,
+        save_fn=save_policy_fn,
         logger=logger)
     print(f'Finished training! Use {result["duration"]}')
 
