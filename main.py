@@ -22,7 +22,7 @@ import tianshou as ts
 class Net(nn.Module):
     def __init__(self, state_shape, action_shape):
         super().__init__()
-        layer_dim = pow(2, math.floor(math.log2(max(18,120))))
+        layer_dim = pow(2, math.floor(math.log2(max(np.prod(state_shape), np.prod(action_shape)))))
         self.model = nn.Sequential(
             nn.Linear(np.prod(state_shape), layer_dim), nn.ReLU(inplace=True),
             nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
