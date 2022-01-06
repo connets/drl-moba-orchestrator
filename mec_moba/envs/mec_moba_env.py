@@ -58,7 +58,6 @@ class MecMobaDQNEvn(gym.Env):
         self._internal_env.implement_action(action_result)
         if self._log_match_data:
             self.log_all_matches_data()
-
         week_end = self._internal_env.inc_timeslot()
         self._internal_env.cleanup_terminated_matches(t_slot_end=False)
         self._generate_and_enqueue_requests()
@@ -72,6 +71,9 @@ class MecMobaDQNEvn(gym.Env):
         self._internal_env.reset()
         self._generate_and_enqueue_requests()
         return self._initial_observation()
+
+    def get_current_observation(self):
+        return self._internal_env.get_time_slot_state().to_array()
 
     def log_all_matches_data(self):
         self._internal_env.log_all_matches_data(log_dir=self._base_log_dir)

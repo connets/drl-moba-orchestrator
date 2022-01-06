@@ -79,15 +79,18 @@ def main(cli_args):
     net = Net(state_shape, action_shape)
     optim = torch.optim.Adam(net.parameters(), lr=1e-4)
 
-    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.9, estimation_step=1, target_update_freq=2000)
+    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=6, target_update_freq=2000)
 
     train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2),
                                         exploration_noise=True)
+    #train_collector.collect(n_step=6)
+
     test_collector = ts.data.Collector(policy, test_env, exploration_noise=True)
+    #test_collector.collect(n_step=6)
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
-    logdir = 'logs/dqn'
+    logdir = 'logs/dqn-128bs'
     writer = SummaryWriter(logdir)
     logger = TensorboardLogger(writer)
 
@@ -97,8 +100,8 @@ def main(cli_args):
 
     result = ts.trainer.offpolicy_trainer(
         policy, train_collector, test_collector,
-        max_epoch=52 * 20, step_per_epoch=1008, step_per_collect=1,
-        update_per_step=4, episode_per_test=10, batch_size=64,
+        max_epoch=52 * 20, step_per_epoch=1008, step_per_collect=4,
+        update_per_step=1, episode_per_test=10, batch_size=128,
         train_fn=lambda epoch, env_step: policy.set_eps(0.1),
         test_fn=lambda epoch, env_step: policy.set_eps(0),
         stop_fn=lambda mean_rewards: mean_rewards >= -200,

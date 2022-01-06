@@ -14,12 +14,40 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.evaluation import evaluate_policy
+import torch
+import torch.nn as nn
+import math
+import numpy as np
+import tianshou as ts
 
 from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.envs.utils.stepLoggerWrapper import StepLogger
+
+
+class Net(nn.Module):
+    def __init__(self, state_shape, action_shape):
+        super().__init__()
+        layer_dim = pow(2, math.floor(math.log2(max(np.prod(state_shape), np.prod(action_shape)))))
+        self.model = nn.Sequential(
+            nn.Linear(np.prod(state_shape), layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
+            nn.Linear(layer_dim, np.prod(action_shape)),
+        )
+
+    def forward(self, obs, state=None, info={}):
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype=torch.float)
+        batch = obs.shape[0]
+        logits = self.model(obs.view(batch, -1))
+        return logits, state
 
 
 class TestAgent:
     def __init__(self):
+        pass
+
+    def initialize(self, env):
         pass
 
     @abc.abstractmethod
@@ -38,17 +66,24 @@ class TestAgent:
 class DqnAgent(TestAgent):
     def __init__(self, model_file):
         super().__init__()
-        self.model = DQN.load(model_file)
+        self.model_file = model_file
+
+        # self.model.load_state_dict(state_dict=)
+
+    def initialize(self, env):
+        state_shape = env.observation_space.shape or env.observation_space.n
+        action_shape = env.action_space.shape or env.action_space.n
+        net = Net(state_shape, action_shape)
+        self.policy = ts.policy.DQNPolicy(net, None, discount_factor=0.99, estimation_step=1, target_update_freq=2000)
+        self.policy.load_state_dict(torch.load(self.model_file))
+        self.policy.eval()
+        self.policy.set_eps(0)
 
     def policy_type(self) -> str:
         return 'dqn'
 
-    def set_env_seed(self, env_obj, seed):
-        self.model.set_env(env_obj)
-        self.model.set_random_seed(seed)
-
     def select_action(self, observation, env_obj: gym.Env):
-        action, _ = self.model.predict(observation, deterministic=True)
+        action, _ = self.policy.forward(observation)
         return action
 
 
@@ -69,60 +104,51 @@ def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=100
                         gen_requests_until=gen_requests_until,
                         log_match_data=True,
                         base_log_dir=f'logs/{seed}/match_logs_{agent.policy_type()}')
-    env = Monitor(env)
+    # env = Monitor(env)
+    env = StepLogger(env, logfile=f'logs/{seed}/eval_test_{agent.policy_type()}.csv')
     env = FlattenObservation(env)
+    env.seed(seed)
 
-    agent.set_env_seed(env, seed)
+    agent.initialize(env)
+    collector = ts.data.Collector(agent.policy, env)
+    collector.collect(n_step=t_slot_to_test)
 
-    with open(f'logs/{seed}/eval_test_{agent.policy_type()}.csv', 'w') as f:
-        f.write(f"{','.join(head_line)}\n")
-        t_slot = 0
-        week = 0
-        obs = env.reset()
-        for i in range(t_slot_to_test):
-            action = agent.select_action(obs, env)
-            obs_pre = obs
-            # print(env.action_id_to_human(action))
-            obs, reward, done, info = env.step(action)
-
-            # LOG
-            args_to_write = [str(week), str(t_slot)]
-            args_to_write += [str(i) for i in obs_pre]
-            args_to_write += list(str(env.action_id_to_human(action))[1:-1].split(','))
-            args_to_write += [str(i) for i in obs]
-            args_to_write.append(str(reward))
-            f.write(f"{','.join(args_to_write)}\n")
-
-            # env.render()
-            t_slot += 1
-            if done:
-                print('week ends')
-                week += 1
-                t_slot = 0
-                obs = env.reset()
+    # with open(f'logs/{seed}/eval_test_{agent.policy_type()}.csv', 'w') as f:
+    #     f.write(f"{','.join(head_line)}\n")
+    #     t_slot = 0
+    #     week = 0
+    #     collector.collect(n_step=1)
+    #     for i in range(t_slot_to_test):
+    #         action = agent.select_action(buffer[0], env)
+    #         obs_pre = obs
+    #         # print(env.action_id_to_human(action))
+    #         obs, reward, done, info = env.step(action)
+    #
+    #         # LOG
+    #         args_to_write = [str(week), str(t_slot)]
+    #         args_to_write += [str(i) for i in obs_pre]
+    #         args_to_write += list(str(env.action_id_to_human(action))[1:-1].split(','))
+    #         args_to_write += [str(i) for i in obs]
+    #         args_to_write.append(str(reward))
+    #         f.write(f"{','.join(args_to_write)}\n")
+    #
+    #         # env.render()
+    #         t_slot += 1
+    #         if done:
+    #             print('week ends')
+    #             week += 1
+    #             t_slot = 0
+    #             obs = env.reset()
 
 
 seeds = [2000]
 
-reward_weights = (1, 1, 1)  # , 0, 0, 0)
-
-state_columns = [f'qos_{i}' for i in range(6)]
-state_columns += [f'f_{i}' for i in range(7)]
-state_columns += ['queue', 'w_t', 'run', 'mig', 'drop']
-
-next_state_columns = [f'{c}_next' for c in state_columns]
-head_line = ['epoch', 't_slot']
-head_line += state_columns
-head_line += ['action_cap', 'action_op', 'action_dep', 'action_mig', ]
-head_line += next_state_columns + ['reward']
+reward_weights = (0.25, 0.5, 1)  # , 0, 0, 0)
 
 for seed in seeds:
     os.makedirs(f'logs/{seed}', exist_ok=True)
 
-    rnd_agent = RandomAgent()
-    run_test(seed, rnd_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
-
-    dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2021_12_29/8/saved_models/dqn_mlp_model_1300320_steps.zip')
+    dqn_agent = DqnAgent(model_file='logs/dqn/dqn.pth')
 
     run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
