@@ -8,7 +8,6 @@ import gym
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-from gym.utils.env_checker import check_env
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN

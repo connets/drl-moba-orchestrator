@@ -6,29 +6,27 @@ import argparse
 import yaml
 from multiprocessing import Pool
 
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 from gym.wrappers import FlattenObservation
-from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from collections import namedtuple
 import itertools
 
-from mec_moba.drlalgo.ddqn import DDQN
-from mec_moba.envs import MecMobaDQNEvn
+import torch, math, numpy as np
+from torch import nn
+import tianshou as ts
 
-grid_search_params = ['drl_algo',
-                      'learning_starts',
-                      'buffer_size',
+from torch.utils.tensorboard import SummaryWriter
+from tianshou.utils import TensorboardLogger
+
+from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.policy_models.mlp_policy import MLPNet
+
+grid_search_params = ['buffer_size',
                       'target_update_interval',
                       'gamma',
-                      'exploration_fraction',
-                      'exploration_final_eps',
+                      'train_eps',
                       'batch_size',
                       'learning_rate',
-                      'train_freq',
                       'reward_weights']
 
 run_parameter_fields_to_save = ['run_id', 'train_epochs', 'seed'] + grid_search_params
@@ -38,26 +36,18 @@ run_parameter_fields = run_parameter_fields_to_save + extra_run_parameter_fields
 sqlite_field_type_dict = {'run_id': 'text',
                           'train_epochs': 'integer',
                           'seed': 'integer',
-                          'drl_algo': 'text',
-                          'learning_starts': 'integer',
                           'buffer_size': 'integer',
                           'target_update_interval': 'integer',
                           'gamma': 'real',
-                          'exploration_fraction': 'real',
-                          'exploration_final_eps': 'real',
+                          'train_eps': 'real',
                           'batch_size': 'integer',
                           'learning_rate': 'real',
-                          'train_freq': 'integer',
                           'reward_weights': 'text'
                           }
 
 assert all(map(lambda k: k in sqlite_field_type_dict, run_parameter_fields_to_save))
 
 RunParameters = namedtuple('RunParameters', run_parameter_fields)
-
-# DRL ALGOs
-drl_algo = {'DQN': DQN,
-            'DDQN': DDQN}
 
 
 # DB
@@ -85,9 +75,14 @@ def insert_all_runs(db_conn, experiments):
     cur.close()
 
 
+def create_save_policy_fn(model_save_dir, save_policy_id):
+    def f(policy_obj):
+        torch.save(policy_obj.state_dict(), f'{model_save_dir}/dqn-{next(save_policy_id)}.pth')
+
+    return f
+
+
 def training_process(run_params: RunParameters):
-    env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
-    env = FlattenObservation(env)
     # check_env(env, warn=True)
     model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
     os.makedirs(model_save_dir)
@@ -95,27 +90,39 @@ def training_process(run_params: RunParameters):
     tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
 
     learn_weeks = run_params.train_epochs
-    save_freq_steps = 1008 * 52
 
-    checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path=model_save_dir,
-                                             name_prefix='dqn_mlp_model')
+    train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+    train_env = FlattenObservation(train_env)
 
-    run_drl_algo = drl_algo[run_params.drl_algo]  # TODO: now it works with DQN and DDQN only
-    model = run_drl_algo('MlpPolicy', env,
-                         verbose=1,
-                         learning_starts=run_params.learning_starts,
-                         buffer_size=run_params.buffer_size,
-                         target_update_interval=run_params.target_update_interval,
-                         gamma=run_params.gamma,
-                         exploration_fraction=run_params.exploration_fraction,
-                         exploration_final_eps=run_params.exploration_final_eps,
-                         batch_size=run_params.batch_size,
-                         train_freq=run_params.train_freq,
-                         learning_rate=run_params.learning_rate,
-                         tensorboard_log=tb_log_dir)
+    test_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+    test_env = FlattenObservation(test_env)
 
-    model.set_random_seed(run_params.seed)
-    model.learn(total_timesteps=1008 * learn_weeks, callback=checkpoint_callback, tb_log_name=run_params.run_id)
+    state_shape = train_env.observation_space.shape or train_env.observation_space.n
+    action_shape = train_env.action_space.shape or train_env.action_space.n
+    net = MLPNet(state_shape, action_shape)
+    optim = torch.optim.Adam(net.parameters(), lr=run_params.learning_rate)
+
+    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=1, target_update_freq=run_params.target_update_interval)
+    replay_buffer = ts.data.PrioritizedReplayBuffer(run_params.buffer_size, alpha=0.6, beta=0.2)
+
+    train_collector = ts.data.Collector(policy, train_env, replay_buffer, exploration_noise=True)
+    test_collector = ts.data.Collector(policy, test_env, exploration_noise=False)
+
+    tb_logger = TensorboardLogger(SummaryWriter(os.path.join(tb_log_dir,run_params.run_id)))
+
+    save_policy_id = itertools.count(0)
+    save_policy_fn = create_save_policy_fn(model_save_dir, save_policy_id)
+
+    result = ts.trainer.offpolicy_trainer(
+        policy, train_collector, test_collector,
+        max_epoch=52 * 30, step_per_epoch=1008, step_per_collect=4,
+        update_per_step=1, episode_per_test=10, batch_size=run_params.batch_size,
+        train_fn=lambda epoch, env_step: policy.set_eps(run_params.train_eps),
+        test_fn=lambda epoch, env_step: policy.set_eps(0),
+        stop_fn=lambda mean_rewards: mean_rewards >= 0,
+        save_fn=save_policy_fn,
+        logger=tb_logger)
+    print(f'Finished training! Use {result["duration"]}')
 
 
 def _generate_run_parameter(run_id, base_dir, train_epochs, seed, grid_params_dict):

@@ -152,7 +152,8 @@ class MatchController:
 
     def get_mean_queue_waiting_time(self):
         current_t_slot = self.environment.absolute_t_slot
-        ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue)
+        #ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue)
+        ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], e.get_queue_waiting_time(current_t_slot)), self.queue)
         return sum(ret_value) / len(self.queue) / defaults[MAX_WAITING_TIME_VALUE_PARAM] if len(self.queue) > 0 else 0
 
     def get_queue_drop_rate(self):

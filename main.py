@@ -39,20 +39,18 @@ class Net(nn.Module):
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(description="DRL MOBA on Stable Baseline 3")
+    parser = argparse.ArgumentParser(description="DRL MOBA on Stable Baseline 3 and tianshou")
     parser.add_argument('--train-epochs', type=int, default=52 * 10, help="Number of training weeks")
-    parser.add_argument('--debug', action='store_true')
     parser.add_argument('--seed', type=int, required=False, default=None)
     dqn_grp_parser = parser.add_argument_group('DQN')
     dqn_grp_parser.add_argument('--dqn-batch-size', default=32, type=int)
     dqn_grp_parser.add_argument('--dqn-buffer-size', default=100_000, type=int)
-    dqn_grp_parser.add_argument('--dqn-final-epsilon', default=0.05, type=float)
-    dqn_grp_parser.add_argument('--dqn-learning-starts', default=5000)
-    dqn_grp_parser.add_argument('--dqn-exploration_fraction', default=0.1)
-
-    resume_evaluate_mtx_grp = parser.add_mutually_exclusive_group()
-    resume_evaluate_mtx_grp.add_argument('--resume', action='store_true')
-    resume_evaluate_mtx_grp.add_argument('--evaluate', action='store_true')
+    dqn_grp_parser.add_argument('--dqn-train-eps', default=0.1, type=float)
+    # dqn_grp_parser.add_argument('--dqn-learning-starts', default=5000)
+    rw_grp_parser = parser.add_argument_group('Reward function')
+    rw_grp_parser.add_argument('--rw-w-qos', default=1.0, type=float)
+    rw_grp_parser.add_argument('--rw-w-op',default=1.0, type=float)
+    rw_grp_parser.add_argument('--rw-w-wt',default=1.0, type=float)
 
     return parser.parse_args()
 
@@ -71,22 +69,20 @@ def main(cli_args):
     learn_weeks = 52 * 100
     save_freq_steps = 1008 * 52
 
-    checkpoint_callback = CheckpointCallback(save_freq=save_freq_steps, save_path='./logs/',
-                                             name_prefix='rl_mlp_model_2')
 
     state_shape = env.observation_space.shape or env.observation_space.n
     action_shape = env.action_space.shape or env.action_space.n
     net = Net(state_shape, action_shape)
     optim = torch.optim.Adam(net.parameters(), lr=1e-4)
 
-    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=6, target_update_freq=2000)
+    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=1, target_update_freq=2000)
 
     train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2),
                                         exploration_noise=True)
-    #train_collector.collect(n_step=6)
+    # train_collector.collect(n_step=6)
 
     test_collector = ts.data.Collector(policy, test_env, exploration_noise=True)
-    #test_collector.collect(n_step=6)
+    # test_collector.collect(n_step=6)
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
@@ -100,11 +96,11 @@ def main(cli_args):
 
     result = ts.trainer.offpolicy_trainer(
         policy, train_collector, test_collector,
-        max_epoch=52 * 20, step_per_epoch=1008, step_per_collect=4,
-        update_per_step=1, episode_per_test=10, batch_size=128,
+        max_epoch=52 * 30, step_per_epoch=1008, step_per_collect=4,
+        update_per_step=1, episode_per_test=10, batch_size=32,
         train_fn=lambda epoch, env_step: policy.set_eps(0.1),
         test_fn=lambda epoch, env_step: policy.set_eps(0),
-        stop_fn=lambda mean_rewards: mean_rewards >= -200,
+        stop_fn=lambda mean_rewards: mean_rewards >= 0,
         save_fn=save_policy_fn,
         logger=logger)
     print(f'Finished training! Use {result["duration"]}')
