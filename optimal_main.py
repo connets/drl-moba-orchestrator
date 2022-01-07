@@ -42,7 +42,7 @@ print(N, F, T)
 cost_c = np.zeros((N, F, T))
 
 # extract_delay()
-info_physical_net = pickle.load(open('data/delay_dict.pkl', 'rb'))
+info_physical_net = extract_delay()
 delay_dict = info_physical_net['delays']
 
 for n in range(N):
