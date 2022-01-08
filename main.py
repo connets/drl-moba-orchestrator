@@ -7,6 +7,7 @@ import argparse
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import progressbar
 from gym.wrappers import FlattenObservation
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import DQN, PPO
@@ -49,8 +50,8 @@ def parse_cli_args():
     # dqn_grp_parser.add_argument('--dqn-learning-starts', default=5000)
     rw_grp_parser = parser.add_argument_group('Reward function')
     rw_grp_parser.add_argument('--rw-w-qos', default=1.0, type=float)
-    rw_grp_parser.add_argument('--rw-w-op',default=1.0, type=float)
-    rw_grp_parser.add_argument('--rw-w-wt',default=1.0, type=float)
+    rw_grp_parser.add_argument('--rw-w-op', default=1.0, type=float)
+    rw_grp_parser.add_argument('--rw-w-wt', default=1.0, type=float)
 
     return parser.parse_args()
 
@@ -69,7 +70,6 @@ def main(cli_args):
     learn_weeks = 52 * 100
     save_freq_steps = 1008 * 52
 
-
     state_shape = env.observation_space.shape or env.observation_space.n
     action_shape = env.action_space.shape or env.action_space.n
     net = Net(state_shape, action_shape)
@@ -77,33 +77,61 @@ def main(cli_args):
 
     policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=1, target_update_freq=2000)
 
-    train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2),
-                                        exploration_noise=True)
+    train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2))
     # train_collector.collect(n_step=6)
 
-    test_collector = ts.data.Collector(policy, test_env, exploration_noise=True)
+    test_collector = ts.data.Collector(policy, test_env)
     # test_collector.collect(n_step=6)
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
-    logdir = 'logs/dqn-128bs'
+    logdir = 'logs/dqn-test'
     writer = SummaryWriter(logdir)
     logger = TensorboardLogger(writer)
 
-    def save_policy_fn(policy_obj):
+    def save_policy_fn(policy_obj, year):
         print('saving policy')
-        torch.save(policy_obj.state_dict(), f'{logdir}/dqn.pth')
+        torch.save(policy_obj.state_dict(), f'{logdir}/dqn-{year}.pth')
 
-    result = ts.trainer.offpolicy_trainer(
-        policy, train_collector, test_collector,
-        max_epoch=52 * 30, step_per_epoch=1008, step_per_collect=4,
-        update_per_step=1, episode_per_test=10, batch_size=32,
-        train_fn=lambda epoch, env_step: policy.set_eps(0.1),
-        test_fn=lambda epoch, env_step: policy.set_eps(0),
-        stop_fn=lambda mean_rewards: mean_rewards >= 0,
-        save_fn=save_policy_fn,
-        logger=logger)
-    print(f'Finished training! Use {result["duration"]}')
+    # pre-collect at least 5000 transitions with random action before training
+    train_collector.collect(n_episode=10, random=True)
+    policy.set_eps(0.1)
+    env_train_step = 0
+    for year in range(20):  # total step
+        print('Year ', year)
+        for week in progressbar.progressbar(range(52)):
+            for i in range(int(1008 / 4)):
+                collect_result = train_collector.collect(n_step=4)
+                env_train_step += int(collect_result["n/st"])
+                update_results = policy.update(64, train_collector.buffer)
+                logger.log_update_data(update_results, env_train_step)
+                logger.log_train_data(collect_result, env_train_step)
+
+        # TEST
+        policy.set_eps(0)
+        test_result = test_collector.collect(n_episode=10)
+        logger.log_test_data(test_result, year)
+        save_policy_fn(policy, year)
+        if test_result['rews'].mean() >= 0:
+            print(f'Finished training! Year {year}: Test mean returns: {test_result["rews"].mean()}')
+            break
+        else:
+            print(f'Testing: year {year}: Test mean returns: {test_result["rews"].mean()}')
+            # back to training eps
+            policy.set_eps(0.1)
+
+        # train policy with a sampled batch data from buffer
+
+    # result = ts.trainer.offpolicy_trainer(
+    #     policy, train_collector, test_collector,
+    #     max_epoch=30, step_per_epoch=1008 * 52, step_per_collect=4,
+    #     update_per_step=1, episode_per_test=10, batch_size=32,
+    #     train_fn=lambda epoch, env_step: policy.set_eps(0.1),
+    #     test_fn=lambda epoch, env_step: policy.set_eps(0),
+    #     stop_fn=lambda mean_rewards: mean_rewards >= 0,
+    #     save_fn=save_policy_fn, test_in_train=False,
+    #     logger=logger)
+    # print(f'Finished training! Use {result["duration"]}')
 
     # model = DDQN('MlpPolicy', env,
     #              verbose=1,

@@ -140,14 +140,14 @@ def run_test(seed, agent: TestAgent, t_slot_to_test=1008, gen_requests_until=100
     #             obs = env.reset()
 
 
-seeds = [2000]
+seeds = [1000, 2000, 3000]
 
 reward_weights = (0.25, 0.5, 1)  # , 0, 0, 0)
 
 for seed in seeds:
     os.makedirs(f'logs/{seed}', exist_ok=True)
 
-    dqn_agent = DqnAgent(model_file='logs/dqn/dqn.pth')
+    dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2022_01_07_tianshou-lib/1/saved_models/dqn-7.pth')
 
     run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
 
