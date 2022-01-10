@@ -133,7 +133,7 @@ class Experiment:
         s_time = time()
 
         self.policy.set_eps(self.run_params.train_eps)
-        for week in range(5):
+        for week in range(52):
             for i in range(int(1008 / self.run_params.train_each_n_step)):
                 collect_result = self.train_collector.collect(n_step=self.run_params.train_each_n_step)
                 self.env_train_step += int(collect_result["n/st"])
