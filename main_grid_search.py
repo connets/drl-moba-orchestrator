@@ -39,6 +39,7 @@ sqlite_field_type_dict = {'run_id': 'text',
                           'seed': 'integer',
                           'buffer_size': 'integer',
                           'target_update_interval': 'integer',
+                          'train_each_n_step': 'integer',
                           'gamma': 'real',
                           'train_eps': 'real',
                           'batch_size': 'integer',
@@ -133,8 +134,8 @@ class Experiment:
         self.policy.set_eps(self.run_params.train_eps)
         env_train_step = 0
         for week in range(52):
-            for i in range(int(1008 / 4)):
-                collect_result = self.train_collector.collect(n_step=4)
+            for i in range(int(1008 / self.run_params.train_each_n_step)):
+                collect_result = self.train_collector.collect(n_step=self.run_params.train_each_n_step)
                 env_train_step += int(collect_result["n/st"])
                 update_results = self.policy.update(self.run_params.batch_size, self.train_collector.buffer)
                 self.tb_logger.log_update_data(update_results, env_train_step)
