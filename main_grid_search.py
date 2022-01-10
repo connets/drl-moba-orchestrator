@@ -136,15 +136,15 @@ class Experiment:
                 collect_result = self.train_collector.collect(n_step=4)
                 env_train_step += int(collect_result["n/st"])
                 update_results = self.policy.update(self.run_params.batch_size, self.train_collector.buffer)
-                self.logger.log_update_data(update_results, env_train_step)
-                self.logger.log_train_data(collect_result, env_train_step)
+                self.tb_logger.log_update_data(update_results, env_train_step)
+                self.tb_logger.log_train_data(collect_result, env_train_step)
 
         print(f'RUN {self.run_params.run_id} - Training year {self.current_training_year} done in {round(time() - s_time, 1)} s')
         # TEST
         s_time = time()
         self.policy.set_eps(0)
         test_result = self.test_collector.collect(n_episode=10)
-        self.logger.log_test_data(test_result, self.current_training_year)
+        self.tb_logger.log_test_data(test_result, self.current_training_year)
         self.save_policy_fn()
         print(f'RUN {self.run_params.run_id} - Testing year {self.current_training_year}: Test mean returns: {test_result["rews"].mean()} in {round(time() - s_time, 1)} s')
 
