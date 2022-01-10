@@ -29,12 +29,12 @@ grid_search_params = ['buffer_size',
                       'learning_rate',
                       'reward_weights']
 
-run_parameter_fields_to_save = ['run_id', 'train_epochs', 'seed'] + grid_search_params
+run_parameter_fields_to_save = ['run_id', 'train_years', 'seed'] + grid_search_params
 extra_run_parameter_fields = ['base_dir']  # these extras fields are needed internally but are not saved
 run_parameter_fields = run_parameter_fields_to_save + extra_run_parameter_fields
 
 sqlite_field_type_dict = {'run_id': 'text',
-                          'train_epochs': 'integer',
+                          'train_years': 'integer',
                           'seed': 'integer',
                           'buffer_size': 'integer',
                           'target_update_interval': 'integer',
@@ -85,7 +85,7 @@ def create_save_policy_fn(model_save_dir, save_policy_id):
 class Experiment:
     def __init__(self, run_params: RunParameters):
         self.run_params = run_params
-        self.current_train_epoch = 0
+        self.current_training_year = 0
 
         # INITIALIZATION
         self.model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
@@ -114,17 +114,17 @@ class Experiment:
         print(f'Created run id {run_params.run_id} object')
 
     def is_done(self):
-        return self.current_train_epoch >= self.run_params.train_epochs
+        return self.current_training_year >= self.run_params.train_years
 
     def save_policy_fn(self):
-        torch.save(self.policy.state_dict(), f'{self.model_save_dir}/policy-{self.current_train_epoch}.pth')
+        torch.save(self.policy.state_dict(), f'{self.model_save_dir}/policy-{self.current_training_year}.pth')
 
     def train_epoch(self):
         # for sanity
         if self.is_done():
             return
         # if this is the first epoch collect 10 weeks before starting the training
-        if self.current_train_epoch == 0:
+        if self.current_training_year == 0:
             self.train_collector.collect(n_episode=10, random=True)
 
         s_time = time()
@@ -139,16 +139,16 @@ class Experiment:
                 self.logger.log_update_data(update_results, env_train_step)
                 self.logger.log_train_data(collect_result, env_train_step)
 
-        print(f'RUN {self.run_params.run_id} - Training epoch {self.current_train_epoch} done in {round(time() - s_time, 1)} s')
+        print(f'RUN {self.run_params.run_id} - Training year {self.current_training_year} done in {round(time() - s_time, 1)} s')
         # TEST
         s_time = time()
         self.policy.set_eps(0)
         test_result = self.test_collector.collect(n_episode=10)
-        self.logger.log_test_data(test_result, self.current_train_epoch)
+        self.logger.log_test_data(test_result, self.current_training_year)
         self.save_policy_fn()
-        print(f'RUN {self.run_params.run_id} - Testing Epoch {self.current_train_epoch}: Test mean returns: {test_result["rews"].mean()} in {round(time() - s_time, 1)} s')
+        print(f'RUN {self.run_params.run_id} - Testing year {self.current_training_year}: Test mean returns: {test_result["rews"].mean()} in {round(time() - s_time, 1)} s')
 
-        self.current_train_epoch += 1
+        self.current_training_year += 1
 
 
 def training_processes(experiments_group):
@@ -159,8 +159,8 @@ def training_processes(experiments_group):
         experiment_to_do_idx = (experiment_to_do_idx + 1) % len(experiments_obj)
 
 
-def _generate_run_parameter(run_id, base_dir, train_epochs, seed, grid_params_dict):
-    d = {'run_id': str(run_id), 'base_dir': base_dir, 'train_epochs': train_epochs, 'seed': seed}
+def _generate_run_parameter(run_id, base_dir, train_years, seed, grid_params_dict):
+    d = {'run_id': str(run_id), 'base_dir': base_dir, 'train_years': train_years, 'seed': seed}
     d.update(**grid_params_dict)
 
     return RunParameters(**d)
@@ -172,7 +172,7 @@ def main():
     parser.add_argument('experiment_tag', type=str, help='A name of this experiment setting')
     parser.add_argument('--seed', type=int, default=-1, help="Seed number. -1 or negative values means random seed ")
     parser.add_argument('-j', type=int, default=os.cpu_count() - 1, help='Number of parallel processes', dest='num_processes')
-    parser.add_argument('--train-epochs', type=int, default=52 * 10, help="Number of training weeks")
+    parser.add_argument('--train-years', type=int, default=10, help="Number of training weeks")
     cli_args = parser.parse_args()
 
     # create all directories
@@ -187,7 +187,7 @@ def main():
 
     # cli read
     seed = int(time()) if cli_args.seed < 0 else cli_args.seed
-    train_epochs = cli_args.train_epochs
+    train_years = cli_args.train_years
 
     # Grid search
     grid_search_config = yaml.load(stream=open(cli_args.conf_file, 'r'), Loader=yaml.SafeLoader)
@@ -198,7 +198,7 @@ def main():
     experiments = map(lambda v: dict(zip(grid_search_params, v)), experiments)
     experiments = (_generate_run_parameter(run_id=i,
                                            base_dir=base_dir,
-                                           train_epochs=train_epochs,
+                                           train_years=train_years,
                                            seed=seed,
                                            grid_params_dict=e)
                    for i, e in enumerate(experiments))
