@@ -23,6 +23,7 @@ from mec_moba.policy_models.mlp_policy import MLPNet
 
 grid_search_params = ['buffer_size',
                       'target_update_interval',
+                      'train_each_n_step',
                       'gamma',
                       'train_eps',
                       'batch_size',
