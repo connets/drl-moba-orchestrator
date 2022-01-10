@@ -18,8 +18,8 @@ MATCH_RESOURCE_PARAM = 'resource'
 NUM_USER_MATCH = 'num_user_match'
 
 defaults = {MAX_WAITING_TIME_PARAM: 0,
-            NUM_GAMES_PER_EPOCH_PARAM: 3500, # 6000,
-            MAX_DURATION_PARAM: 10, #6,
+            NUM_GAMES_PER_EPOCH_PARAM: 6000, # 6000,
+            MAX_DURATION_PARAM: 6, #6,
             QUEUE_EXIT_TIME_PARAM: None,
             MATCH_RESOURCE_PARAM: 1,
             NUM_USER_MATCH: 4

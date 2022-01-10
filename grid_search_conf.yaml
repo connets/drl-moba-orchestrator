@@ -1,6 +1,7 @@
 buffer_size: [ 100000 ]
 target_update_interval: [ 2000 ]
 gamma: [ 0.9 ]
+train_each_n_step: [4]
 train_eps: [ 0.01 ] #, 0.05]
 batch_size: [ 64 ] #[32, 64, 128, 256]
 learning_rate: [ 0.0001 ] #, 0.0005, 0.001]
