@@ -82,47 +82,81 @@ def create_save_policy_fn(model_save_dir, save_policy_id):
     return f
 
 
-def training_process(run_params: RunParameters):
-    # check_env(env, warn=True)
-    model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
-    os.makedirs(model_save_dir)
+class Experiment:
+    def __init__(self, run_params: RunParameters):
+        self.run_params = run_params
+        self.current_train_epoch = 0
 
-    tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
+        # INITIALIZATION
+        self.model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
+        os.makedirs(self.model_save_dir)
 
-    learn_weeks = run_params.train_epochs
+        tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
 
-    train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
-    train_env = FlattenObservation(train_env)
+        train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+        train_env = FlattenObservation(train_env)
 
-    test_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
-    test_env = FlattenObservation(test_env)
+        test_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+        test_env = FlattenObservation(test_env)
 
-    state_shape = train_env.observation_space.shape or train_env.observation_space.n
-    action_shape = train_env.action_space.shape or train_env.action_space.n
-    net = MLPNet(state_shape, action_shape)
-    optim = torch.optim.Adam(net.parameters(), lr=run_params.learning_rate)
+        state_shape = train_env.observation_space.shape or train_env.observation_space.n
+        action_shape = train_env.action_space.shape or train_env.action_space.n
+        net = MLPNet(state_shape, action_shape)
+        optim = torch.optim.Adam(net.parameters(), lr=run_params.learning_rate)
 
-    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=1, target_update_freq=run_params.target_update_interval)
-    replay_buffer = ts.data.PrioritizedReplayBuffer(run_params.buffer_size, alpha=0.6, beta=0.2)
+        self.policy = ts.policy.DQNPolicy(net, optim, discount_factor=run_params.gamma,
+                                          estimation_step=1, target_update_freq=run_params.target_update_interval)
+        replay_buffer = ts.data.PrioritizedReplayBuffer(run_params.buffer_size, alpha=0.6, beta=0.2)
 
-    train_collector = ts.data.Collector(policy, train_env, replay_buffer, exploration_noise=True)
-    test_collector = ts.data.Collector(policy, test_env, exploration_noise=False)
+        self.train_collector = ts.data.Collector(self.policy, train_env, replay_buffer)
+        self.test_collector = ts.data.Collector(self.policy, test_env)
+        self.tb_logger = TensorboardLogger(SummaryWriter(os.path.join(tb_log_dir, run_params.run_id)))
+        print(f'Created run id {run_params.run_id} object')
 
-    tb_logger = TensorboardLogger(SummaryWriter(os.path.join(tb_log_dir,run_params.run_id)))
+    def is_done(self):
+        return self.current_train_epoch >= self.run_params.train_epochs
 
-    save_policy_id = itertools.count(0)
-    save_policy_fn = create_save_policy_fn(model_save_dir, save_policy_id)
+    def save_policy_fn(self):
+        torch.save(self.policy.state_dict(), f'{self.model_save_dir}/policy-{self.current_train_epoch}.pth')
 
-    result = ts.trainer.offpolicy_trainer(
-        policy, train_collector, test_collector,
-        max_epoch=52 * 30, step_per_epoch=1008, step_per_collect=4,
-        update_per_step=1, episode_per_test=10, batch_size=run_params.batch_size,
-        train_fn=lambda epoch, env_step: policy.set_eps(run_params.train_eps),
-        test_fn=lambda epoch, env_step: policy.set_eps(0),
-        stop_fn=lambda mean_rewards: mean_rewards >= 0,
-        save_fn=save_policy_fn,
-        logger=tb_logger)
-    print(f'Finished training! Use {result["duration"]}')
+    def train_epoch(self):
+        # for sanity
+        if self.is_done():
+            return
+        # if this is the first epoch collect 10 weeks before starting the training
+        if self.current_train_epoch == 0:
+            self.train_collector.collect(n_episode=10, random=True)
+
+        s_time = time()
+
+        self.policy.set_eps(self.run_params.train_eps)
+        env_train_step = 0
+        for week in range(52):
+            for i in range(int(1008 / 4)):
+                collect_result = self.train_collector.collect(n_step=4)
+                env_train_step += int(collect_result["n/st"])
+                update_results = self.policy.update(self.run_params.batch_size, self.train_collector.buffer)
+                self.logger.log_update_data(update_results, env_train_step)
+                self.logger.log_train_data(collect_result, env_train_step)
+
+        print(f'RUN {self.run_params.run_id} - Training epoch {self.current_train_epoch} done in {round(time() - s_time, 1)} s')
+        # TEST
+        s_time = time()
+        self.policy.set_eps(0)
+        test_result = self.test_collector.collect(n_episode=10)
+        self.logger.log_test_data(test_result, self.current_train_epoch)
+        self.save_policy_fn()
+        print(f'RUN {self.run_params.run_id} - Testing Epoch {self.current_train_epoch}: Test mean returns: {test_result["rews"].mean()} in {round(time() - s_time, 1)} s')
+
+        self.current_train_epoch += 1
+
+
+def training_processes(experiments_group):
+    experiments_obj = [Experiment(e) for e in experiments_group if e is not None]
+    experiment_to_do_idx = 0
+    while not all([e.is_done() for e in experiments_obj]):
+        experiments_obj[experiment_to_do_idx].train_epoch()
+        experiment_to_do_idx = (experiment_to_do_idx + 1) % len(experiments_obj)
 
 
 def _generate_run_parameter(run_id, base_dir, train_epochs, seed, grid_params_dict):
@@ -172,8 +206,14 @@ def main():
     experiments = list(experiments)
     insert_all_runs(db_conn=db_connection, experiments=experiments)
 
+    def grouper(iterable, n, fillvalue=None):
+        args = [iter(iterable)] * n
+        return itertools.zip_longest(*args, fillvalue=fillvalue)
+
+    grp_experiments = grouper(experiments, n=math.ceil(len(experiments) / cli_args.num_processes))
+
     with Pool(processes=cli_args.num_processes) as pool:
-        pool.map(training_process, experiments)
+        pool.map(training_processes, grp_experiments)
 
 
 # Press the green button in the gutter to run the script.
