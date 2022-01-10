@@ -88,6 +88,7 @@ class Experiment:
     def __init__(self, run_params: RunParameters):
         self.run_params = run_params
         self.current_training_year = 0
+        self.env_train_step = 0
 
         # INITIALIZATION
         self.model_save_dir = os.path.join(run_params.base_dir, run_params.run_id, 'saved_models')
@@ -132,14 +133,13 @@ class Experiment:
         s_time = time()
 
         self.policy.set_eps(self.run_params.train_eps)
-        env_train_step = 0
-        for week in range(52):
+        for week in range(5):
             for i in range(int(1008 / self.run_params.train_each_n_step)):
                 collect_result = self.train_collector.collect(n_step=self.run_params.train_each_n_step)
-                env_train_step += int(collect_result["n/st"])
+                self.env_train_step += int(collect_result["n/st"])
                 update_results = self.policy.update(self.run_params.batch_size, self.train_collector.buffer)
-                self.tb_logger.log_update_data(update_results, env_train_step)
-                self.tb_logger.log_train_data(collect_result, env_train_step)
+                self.tb_logger.log_update_data(update_results, self.env_train_step)
+                self.tb_logger.log_train_data(collect_result, self.env_train_step)
 
         print(f'RUN {self.run_params.run_id} - Training year {self.current_training_year} done in {round(time() - s_time, 1)} s')
         # TEST
