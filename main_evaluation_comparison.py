@@ -104,7 +104,7 @@ def grouper(iterable, n, fillvalue=None):
 def run_comparison_main():
     parser = argparse.ArgumentParser(description="DRL MOBA Policy comparative evaluation")
     parser.add_argument('experiment_tag', type=str, help='A name of the training experiment setting')
-    parser.add_argument('evaluation_tag', type=str, help='A name of this evaluation setting')
+    # parser.add_argument('evaluation_tag', type=str, help='A name of this evaluation setting')
     parser.add_argument('--num-scenarios', type=int, default=10, help="Number of scenarios ")
     parser.add_argument('--rnd-repeats', type=int, default=10, help="Number of random repetitions")
     parser.add_argument('-j', type=int, default=os.cpu_count() - 4, help='Number of parallel processes', dest='num_processes')
@@ -119,6 +119,8 @@ def run_comparison_main():
     ray.init(num_cpus=num_ray_processes)
 
     base_log_dir = os.path.join('out_eval', cli_args.evaluation_tag)
+    evaluation_tag = f'eval-{cli_args.experiment_tag}'
+    base_log_dir = os.path.join('out_eval', evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
 
     rnd = np.random.default_rng()
