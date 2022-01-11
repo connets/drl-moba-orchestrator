@@ -8,7 +8,7 @@ import pickle
 from mec_moba.environment.matches import GameGenerator
 
 
-def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs'):
+def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs', max_threads=0):
     T_SLOTS = evaluation_t_slot
     T = T_SLOTS + 6 * 12
     F = 7
@@ -64,6 +64,7 @@ def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs'):
     m.Params.LogToConsole = 1
     m.Params.MIPGap = 0.01
     m.Params.TimeLimit = 3000
+    m.Params.Threads = max_threads
 
     # Create variables
     x = m.addMVar((N, F, T), vtype=gp.GRB.BINARY, name="X")

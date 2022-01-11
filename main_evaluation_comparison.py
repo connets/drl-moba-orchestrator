@@ -2,6 +2,7 @@ import argparse
 import itertools
 import os
 import sqlite3
+import ray
 
 import numpy as np
 import re
@@ -26,6 +27,15 @@ def get_reward_weights_from_run_id(run_id, experiment_tag):
     return tuple(map(float, cur.fetchone()[0][1:-1].split(',')))
 
 
+@ray.remote
+def compute_optimal_solution_wrapper(seed, evaluation_t_slot, base_log_dir, max_threads):
+    compute_optimal_solution(seed,
+                             evaluation_t_slot=evaluation_t_slot,
+                             base_log_dir=base_log_dir,
+                             max_threads=max_threads)
+
+
+@ray.remote
 def run_test(seed, agent: TestAgent, reward_weights, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008):
     # print(reward_weights, base_log_dir)
     os.makedirs(base_log_dir, exist_ok=True)
@@ -63,22 +73,32 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
 
     unique_run_ids = set((run.run_id for run in run_policy_dirs))
 
-    for run in progressbar.progressbar(run_policy_dirs, prefix='DQN policy '):
-        run_test(seed=seed,
-                 agent=DqnAgent(model_file=run.policy_filepath),
-                 t_slot_to_test=evaluation_t_slot + 12 * 6,
-                 reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
-                 gen_requests_until=evaluation_t_slot,
-                 base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}"))
+    remote_ids = []
+
+    # for run in progressbar.progressbar(run_policy_dirs, prefix='DQN policy '):
+    for run in run_policy_dirs:
+        remote_ids.append(run_test.remote(seed=seed,
+                                          agent=DqnAgent(model_file=run.policy_filepath),
+                                          t_slot_to_test=evaluation_t_slot + 12 * 6,
+                                          reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
+                                          gen_requests_until=evaluation_t_slot,
+                                          base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}")))
 
         # RANDOM
-    for run_id, rnd_run in progressbar.progressbar(list(itertools.product(unique_run_ids, range(repeat))), prefix='Random policy '):
-        run_test(seed=seed,
-                 agent=RandomAgent(),
-                 t_slot_to_test=evaluation_t_slot + 12 * 6,
-                 reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
-                 gen_requests_until=evaluation_t_slot,
-                 base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}"))
+    # for run_id, rnd_run in progressbar.progressbar(list(itertools.product(unique_run_ids, range(repeat))), prefix='Random policy '):
+    for run_id, rnd_run in itertools.product(unique_run_ids, range(repeat)):
+        remote_ids.append(run_test.remote(seed=seed,
+                                          agent=RandomAgent(),
+                                          t_slot_to_test=evaluation_t_slot + 12 * 6,
+                                          reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
+                                          gen_requests_until=evaluation_t_slot,
+                                          base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}")))
+    return remote_ids
+
+
+def grouper(iterable, n, fillvalue=None):
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=fillvalue)
 
 
 def run_comparison_main():
@@ -87,10 +107,16 @@ def run_comparison_main():
     parser.add_argument('evaluation_tag', type=str, help='A name of this evaluation setting')
     parser.add_argument('--num-scenarios', type=int, default=10, help="Number of scenarios ")
     parser.add_argument('--rnd-repeats', type=int, default=10, help="Number of random repetitions")
-    # parser.add_argument('-j', type=int, default=os.cpu_count() - 1, help='Number of parallel processes', dest='num_processes')
+    parser.add_argument('-j', type=int, default=os.cpu_count() - 4, help='Number of parallel processes', dest='num_processes')
+    parser.add_argument('-g', type=int, default=4, help='Number of parallel gurobi processes', dest='num_gurobi_processes')
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
     cli_args = parser.parse_args()
+
+    num_ray_processes = cli_args.num_processes
+    num_gurobi_processes = cli_args.num_gurobi_processes
+
+    ray.init(num_cpus=num_ray_processes)
 
     base_log_dir = os.path.join('out_eval', cli_args.evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
@@ -101,17 +127,27 @@ def run_comparison_main():
     else:
         seeds = pd.read_csv(cli_args.seeds_file, names=['seed'])['seed'].unique()
 
+    remote_ids = []
     for seed in seeds:
-        # COMPUTE OPTIMAL SOLUTION
-        compute_optimal_solution(seed,
-                                 evaluation_t_slot=cli_args.test_t_slot,
-                                 base_log_dir=base_log_dir)
         # EVALUATE POLICIES SOLUTION and EVALUATE RANDOM SOLUTION
-        evaluate_dqn_policies_and_random(seed,
-                                         experiment_tag=cli_args.experiment_tag,
-                                         evaluation_t_slot=cli_args.test_t_slot,
-                                         base_log_dir=base_log_dir,
-                                         repeat=cli_args.rnd_repeats)
+        remote_ids.extend(evaluate_dqn_policies_and_random(seed,
+                                                           experiment_tag=cli_args.experiment_tag,
+                                                           evaluation_t_slot=cli_args.test_t_slot,
+                                                           base_log_dir=base_log_dir,
+                                                           repeat=cli_args.rnd_repeats))
+    # wait until finish
+    ray.get(remote_ids)
+
+    max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
+
+    for seed_group in grouper(seeds, num_gurobi_processes):
+        # COMPUTE OPTIMAL SOLUTION
+        remote_ids = [compute_optimal_solution_wrapper.remote(seed,
+                                                              evaluation_t_slot=cli_args.test_t_slot,
+                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads)
+                      for seed in seed_group if seed is not None]
+        # wait until finish
+        ray.get(remote_ids)
 
 
 if __name__ == "__main__":
