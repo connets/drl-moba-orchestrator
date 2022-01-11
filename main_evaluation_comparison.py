@@ -118,7 +118,6 @@ def run_comparison_main():
 
     ray.init(num_cpus=num_ray_processes)
 
-    base_log_dir = os.path.join('out_eval', cli_args.evaluation_tag)
     evaluation_tag = f'eval-{cli_args.experiment_tag}'
     base_log_dir = os.path.join('out_eval', evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
