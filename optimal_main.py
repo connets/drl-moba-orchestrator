@@ -1,21 +1,15 @@
 import os
 import numpy as np
-import json
-# from data.probability_extractor import *
-# from data.delay_exctractor import *
-# from data.user_home_extractor import *
 from mec_moba.environment.utils.delay_exctractor import *
 import gurobipy as gp
-import math
 import csv
-import itertools
 import pickle
 
 from mec_moba.environment.matches import GameGenerator
 
 
-def compute_optimal_solution(seed):
-    T_SLOTS = 144
+def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs'):
+    T_SLOTS = evaluation_t_slot
     T = T_SLOTS + 6 * 12
     F = 7
     MATCH_DURATION = 10
@@ -34,15 +28,16 @@ def compute_optimal_solution(seed):
             request_time_sigma.append(t_slot)
 
     print(len(games))
-    os.makedirs(f'logs/{SEED}', exist_ok=True)
-    os.makedirs(f'logs/{SEED}/opt', exist_ok=True)
+    os.makedirs(f'{base_log_dir}/{SEED}/opt', exist_ok=True)
+    # os.makedirs(f'logs/{SEED}/opt', exist_ok=True)
 
-    pickle.dump([g.to_dict() for g in games], open(f'logs/{SEED}/games.pkl', 'wb'))
+    pickle.dump([g.to_dict() for g in games], open(f'{base_log_dir}/{SEED}/games.pkl', 'wb'))
 
     N = len(games)
 
     print(N, F, T)
 
+    # return
     cost_c = np.zeros((N, F, T))
 
     # extract_delay()
@@ -67,7 +62,7 @@ def compute_optimal_solution(seed):
     # Create a new model
     m = gp.Model("DQN")
     m.Params.LogToConsole = 1
-    m.Params.MIPGap = 0.001
+    m.Params.MIPGap = 0.01
     m.Params.TimeLimit = 3000
 
     # Create variables
@@ -117,7 +112,7 @@ def compute_optimal_solution(seed):
 
     else:
         print('success', m.objVal)
-        with open(f'logs/{SEED}/opt/x.csv', 'w', newline='') as fd:
+        with open(f'{base_log_dir}/{SEED}/opt/x.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
             for t in range(T):
                 for j in range(F):
@@ -125,14 +120,14 @@ def compute_optimal_solution(seed):
                         if x[i][j][t].x > 0:
                             writer.writerow([t, j, i, x[i][j][t].x])
 
-        with open(f'logs/{SEED}/opt/s.csv', 'w', newline='') as fd:
+        with open(f'{base_log_dir}/{SEED}/opt/s.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
             for t in range(T):
                 for i in range(N):
                     if s[i, t].x > 0:
                         writer.writerow([t, i, s[i, t].x])
 
-    with open(f'logs/{SEED}/opt/sigma.csv', 'w', newline='') as f_d:
+    with open(f'{base_log_dir}/{SEED}/opt/sigma.csv', 'w', newline='') as f_d:
         writer = csv.writer(f_d)
         writer.writerows([[i, request_time_sigma[i]] for i in range(len(request_time_sigma))])
 
