@@ -10,9 +10,9 @@ from mec_moba.environment.matches import GameGenerator
 
 def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs', max_threads=0):
     T_SLOTS = evaluation_t_slot
-    T = T_SLOTS + 6 * 12
+    T = T_SLOTS + 6 #* 12
     F = 7
-    MATCH_DURATION = 10
+    MATCH_DURATION = 6
     SEED = seed
     # N = int(3500 / 7)
 
@@ -86,6 +86,9 @@ def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs', m
         (sum([x[i, j, t] for j in range(F)]) == sum([s[i, _t] for _t in range(max(0, t - delta), t)]) for i in range(N) for t in range(T)),
         name='c0')
 
+    m.addConstrs(
+        (sum([x[i, j, t] for j in range(F) for t in range(T)]) == delta for i in range(N)), name='c_a')
+
     #
     m.addConstrs((sum([s[i, t] for t in range(request_time_sigma[i], T)]) == 1 for i in range(N)),
                  name='c1')
@@ -134,5 +137,5 @@ def compute_optimal_solution(seed, evaluation_t_slot=144, base_log_dir='logs', m
 
 
 if __name__ == '__main__':
-    for seed in [1000, 2000, 3000]:
+    for seed in [1000]:
         compute_optimal_solution(seed)
