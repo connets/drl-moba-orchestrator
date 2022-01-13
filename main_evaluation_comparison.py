@@ -123,7 +123,7 @@ def run_comparison_main():
 
     ray.init(num_cpus=num_ray_processes)
 
-    evaluation_tag = f'eval-{cli_args.experiment_tag}-{cli_args.evaluation_tag}'
+    evaluation_tag = f'eval-{cli_args.experiment_tag}-{cli_args.evaluation_tag}' if cli_args.evaluation_tag != '' else f'eval-{cli_args.experiment_tag}'
     base_log_dir = os.path.join('out_eval', evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
 
@@ -151,7 +151,7 @@ def run_comparison_main():
         # COMPUTE OPTIMAL SOLUTION
         remote_ids = [compute_optimal_solution_wrapper.remote(seed,
                                                               evaluation_t_slot=cli_args.test_t_slot,
-                                                              match_probability_file= cli_args.match_probability_file,
+                                                              match_probability_file=cli_args.match_probability_file,
                                                               base_log_dir=base_log_dir, max_threads=max_gurobi_threads)
                       for seed in seed_group if seed is not None]
         # wait until finish
