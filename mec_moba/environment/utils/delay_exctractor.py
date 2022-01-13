@@ -2,7 +2,7 @@ import pickle
 import csv
 import pandas
 
-allowed_facilities = {5, 16, 17, 19, 25, 30, 31}
+allowed_facilities = [5, 16, 17, 19, 25, 30, 31]
 
 
 def extract_delay():

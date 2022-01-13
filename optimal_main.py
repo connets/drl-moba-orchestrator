@@ -58,7 +58,6 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
     for n in range(N):
         for t in range(T):
             w[n, t] = max(0, t - request_time_sigma[n])
-
     # Create a new model
     m = gp.Model("DQN")
     m.Params.LogToConsole = 1
@@ -83,7 +82,7 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
     #
     m.addConstrs(
-        (sum([x[i, j, t] for j in range(F)]) == sum([s[i, _t] for _t in range(max(0, t - delta), t+1)])
+        (sum([x[i, j, t] for j in range(F)]) == sum([s[i, _t] for _t in range(max(0, t - delta + 1), t + 1)])
          for i in range(N) for t in range(T)),
         name='c0')
 
@@ -93,15 +92,16 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
     m.addConstrs((sum([s[i, t] for t in range(request_time_sigma[i], T - delta)]) == 1 for i in range(N)),
                  name='c1')
 
-    # m.addConstrs((sum([s[i, t] for t in range(0, request_time_sigma[i])]) == 0 for i in range(N)),
-    #              name='c1_2')
-    #
-    # m.addConstrs((sum([s[i, t] for t in range(T - delta, T)]) == 0 for i in range(N)),
-    #              name='c1_3')
+    m.addConstrs((sum([s[i, t] for t in range(0, request_time_sigma[i])]) == 0 for i in range(N)),
+                 name='c1_2')
 
-    #
-    m.addConstrs(((x[i, j, t + 1] - x[i, j, t] <= y[i, t]) for i in range(N) for j in range(F) for t in range(T - 1)),
+    m.addConstrs((sum([s[i, t] for t in range(T - delta, T)]) == 0 for i in range(N)),
+                 name='c1_3')
+
+    m.addConstrs((x[i, j, t + 1] - x[i, j, t] - (1 - sum(x[i, j_, t] for j_ in range(F))) <= y[i, t] for i in range(N) for j in range(F) for t in range(T - 1)),
                  name='c2')
+    # m.addConstrs((x[i, j, t + 1] - x[i, j, t] <= y[i, t] for i in range(N) for j in range(F) for t in range(T - 1)),
+    #              name='c2')
 
     #
     m.addConstrs(((sum([x[i, j, t] for i in range(N)]) <= 8 + v[j, t]) for j in range(F) for t in range(T)),
@@ -120,6 +120,11 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
     else:
         print('success', m.objVal)
+        print('Qos component:', sum(sum(sum([cost_c[i, j, t] * x[i, j, t].x for j in range(F)]) for i in range(N)) for t in range(T)))
+        print('Op component:', sum(sum([1 * v[j, t].x for j in range(F)]) for t in range(T)))
+        print('Mig component:', sum(sum([1 * y[i, t].x for i in range(N)]) for t in range(T)))
+        print('Sched component:', sum(sum(w[i, t] * s[i, t].x for i in range(N)) for t in range(T)))
+
         with open(f'{base_log_dir}/{SEED}/opt/x.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
             for t in range(T):
@@ -134,6 +139,13 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
                 for i in range(N):
                     if s[i, t].x > 0:
                         writer.writerow([t, i, s[i, t].x])
+
+        with open(f'{base_log_dir}/{SEED}/opt/y.csv', 'w', newline='') as fd:
+            writer = csv.writer(fd)
+            for t in range(T):
+                for i in range(N):
+                    if y[i, t].x > 0:
+                        writer.writerow([t, i, y[i, t].x])
 
     with open(f'{base_log_dir}/{SEED}/opt/sigma.csv', 'w', newline='') as f_d:
         writer = csv.writer(f_d)
