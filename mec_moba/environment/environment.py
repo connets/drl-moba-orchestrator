@@ -164,13 +164,13 @@ class Environment:
     def default_reward_weights():
         return tuple([1] * len(reward_comp_order))
 
-    def __init__(self, reward_weights, gen_requests_until=None, normalize_reward=True):
+    def __init__(self, reward_weights, gen_requests_until=None, match_probability_file=None, normalize_reward=True):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
-        self.match_generator = GameGenerator(gen_requests_until)
+        self.match_generator = GameGenerator(gen_requests_until, match_probability_file=match_probability_file)
         self.reward_weights = reward_weights
         # self.gen_requests_until = gen_requests_until
-        self.normalize_reward= normalize_reward
+        self.normalize_reward = normalize_reward
         self.validate_action_enabled = False  # get_config_value(Environment.get_module_config_name(), VALIDATE_ACTION_PARAM)
 
         self._epoch_t_slot = 0
@@ -230,7 +230,6 @@ class Environment:
         if self.normalize_reward:
             reward /= worst_value_sum
         return reward, split_rewards
-
 
     def inc_timeslot(self) -> bool:
         # print('running matches', len(self.match_controller.running))

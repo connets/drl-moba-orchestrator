@@ -18,8 +18,8 @@ MATCH_RESOURCE_PARAM = 'resource'
 NUM_USER_MATCH = 'num_user_match'
 
 defaults = {MAX_WAITING_TIME_PARAM: 0,
-            NUM_GAMES_PER_EPOCH_PARAM: 6000, # 6000,
-            MAX_DURATION_PARAM: 6, #6,
+            NUM_GAMES_PER_EPOCH_PARAM: 6000,  # 6000,
+            MAX_DURATION_PARAM: 6,  # 6,
             QUEUE_EXIT_TIME_PARAM: None,
             MATCH_RESOURCE_PARAM: 1,
             NUM_USER_MATCH: 4
@@ -38,7 +38,7 @@ class GameGenerator:
     #             ConfigOption(name=NUM_USER_MATCH, default_value=4, help_string='Number of user per match')
     #             ]
 
-    def __init__(self, gen_requests_until=None, no_overlapping=False):
+    def __init__(self, gen_requests_until=None, no_overlapping=False, match_probability_file=None):
         # distribuzione durata di una partita (la durata è in timeslots)
         self.duration = defaults[MAX_DURATION_PARAM]
         self.max_wait = defaults[MAX_WAITING_TIME_PARAM]
@@ -64,7 +64,7 @@ class GameGenerator:
         self.no_overlapping = no_overlapping
 
         # probabilità di giocare per ogni timeslot da testare per ogni gruppo
-        self.probability_to_play = extract_game_requests_probability()
+        self.probability_to_play = extract_game_requests_probability(fname=match_probability_file)
 
         # ottengo il dizionario con le bs e tutti gli utenti sotot a ciascuna
         self.users_bss = extract_users()
@@ -107,7 +107,7 @@ class GameGenerator:
         # if t_slot key is not in the dictionary it means zero matches!!
         x = list(self.history.get(t_slot, []))
         self.epoch_games_generated += len(x)
-        #print('Game generated ', t_slot, self.epoch_games_generated)
+        # print('Game generated ', t_slot, self.epoch_games_generated)
 
         return x
 

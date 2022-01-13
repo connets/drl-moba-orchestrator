@@ -22,12 +22,14 @@ class MecMobaDQNEvn(gym.Env):
         actions = filter(lambda a: a[2] + a[3] > 0, actions)
         return {a_id: DqnAction(*a) for a_id, a in enumerate(actions)}
 
-    def __init__(self, reward_weights=None, gen_requests_until=None, log_match_data=False, base_log_dir=None):
+    def __init__(self, reward_weights=None, gen_requests_until=None, match_probability_file=None, log_match_data=False, base_log_dir=None):
         super(MecMobaDQNEvn, self).__init__()
         if reward_weights is None:
             reward_weights = Environment.default_reward_weights()
 
-        self._internal_env = Environment(reward_weights=reward_weights, gen_requests_until=gen_requests_until)
+        self._internal_env = Environment(reward_weights=reward_weights,
+                                         gen_requests_until=gen_requests_until,
+                                         match_probability_file=match_probability_file)
         logging.info(f'State features number: {self._internal_env.get_time_slot_state_n_features()}')
         self.observation_space = Box(low=0.0, high=1.0, shape=(1, self._internal_env.get_time_slot_state_n_features()))
         self._actions_dict = MecMobaDQNEvn._create_action_space_map()

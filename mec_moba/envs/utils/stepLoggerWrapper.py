@@ -21,8 +21,8 @@ class StepLogger(gym.Wrapper):
         self.step_logger.write(f"{','.join(head_line)}\n")
 
     def _log(self, observation, action, reward, next_observation):
-        week = int((self.env._internal_env.absolute_t_slot-1)/ 1008)
-        t_slot = (self.env._internal_env.absolute_t_slot - 1)%1008
+        week = int((self.env._internal_env.absolute_t_slot - 1) / 1008)
+        t_slot = (self.env._internal_env.absolute_t_slot - 1) % 1008
         args_to_write = [str(week), str(t_slot)]
         args_to_write += [str(i) for i in observation[0]]
         args_to_write += list(str(self.env.action_id_to_human(action))[1:-1].split(','))

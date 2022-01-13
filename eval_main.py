@@ -49,7 +49,6 @@ class TestAgent:
         pass
 
 
-
 class DqnAgent(TestAgent):
     def __init__(self, model_file):
         super().__init__()
@@ -87,15 +86,15 @@ class RandomAgent(TestAgent):
         self.policy.eval()
         self.policy.set_eps(1.0)
 
-
     # def select_action(self, observation, env_obj: gym.Env):
     #     return env_obj.action_space.sample()
 
 
-def run_test(seed, agent: TestAgent, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008 ):
+def run_test(seed, agent: TestAgent, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008, match_probability_file=None):
     env = MecMobaDQNEvn(reward_weights=reward_weights,
                         gen_requests_until=gen_requests_until,
                         log_match_data=True,
+                        match_probability_file=match_probability_file,
                         base_log_dir=f'{base_log_dir}/match_logs_{agent.policy_type()}')
     # env = Monitor(env)
     env = StepLogger(env, logfile=f'{base_log_dir}/eval_test_{agent.policy_type()}.csv')
@@ -106,42 +105,18 @@ def run_test(seed, agent: TestAgent, base_log_dir, t_slot_to_test=1008, gen_requ
     collector = ts.data.Collector(agent.policy, env)
     collector.collect(n_step=t_slot_to_test)
 
-    # with open(f'logs/{seed}/eval_test_{agent.policy_type()}.csv', 'w') as f:
-    #     f.write(f"{','.join(head_line)}\n")
-    #     t_slot = 0
-    #     week = 0
-    #     collector.collect(n_step=1)
-    #     for i in range(t_slot_to_test):
-    #         action = agent.select_action(buffer[0], env)
-    #         obs_pre = obs
-    #         # print(env.action_id_to_human(action))
-    #         obs, reward, done, info = env.step(action)
-    #
-    #         # LOG
-    #         args_to_write = [str(week), str(t_slot)]
-    #         args_to_write += [str(i) for i in obs_pre]
-    #         args_to_write += list(str(env.action_id_to_human(action))[1:-1].split(','))
-    #         args_to_write += [str(i) for i in obs]
-    #         args_to_write.append(str(reward))
-    #         f.write(f"{','.join(args_to_write)}\n")
-    #
-    #         # env.render()
-    #         t_slot += 1
-    #         if done:
-    #             print('week ends')
-    #             week += 1
-    #             t_slot = 0
-    #             obs = env.reset()
 
 
 if __name__ == '__main__':
-    seeds = [1000, 2000, 3000]
+    seeds = [1000]
 
     reward_weights = (0.25, 0.5, 1)  # , 0, 0, 0)
 
     for seed in seeds:
         os.makedirs(f'logs/{seed}', exist_ok=True)
 
-        dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2022_01_07_tianshou-lib/1/saved_models/dqn-7.pth')
+        dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2022_01_10_6000matches_6ts/4/saved_models/policy-15.pth')
 
-        run_test(seed, dqn_agent, t_slot_to_test=144 + 12 * 6, gen_requests_until=144)
+        run_test(seed, dqn_agent, t_slot_to_test=144 + 6 * 5,
+                 gen_requests_until=144, base_log_dir=f'logs/{seed}',
+                 match_probability_file=None) #'data/match_probability_uniform.csv')

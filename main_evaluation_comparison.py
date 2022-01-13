@@ -28,21 +28,23 @@ def get_reward_weights_from_run_id(run_id, experiment_tag):
 
 
 @ray.remote
-def compute_optimal_solution_wrapper(seed, evaluation_t_slot, base_log_dir, max_threads):
+def compute_optimal_solution_wrapper(seed, evaluation_t_slot, base_log_dir, match_probability_file, max_threads):
     compute_optimal_solution(seed,
                              evaluation_t_slot=evaluation_t_slot,
                              base_log_dir=base_log_dir,
+                             match_probability_file=match_probability_file,
                              max_threads=max_threads)
 
 
 @ray.remote
-def run_test(seed, agent: TestAgent, reward_weights, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008):
+def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008, ):
     # print(reward_weights, base_log_dir)
     os.makedirs(base_log_dir, exist_ok=True)
 
     env = MecMobaDQNEvn(reward_weights=reward_weights,
                         gen_requests_until=gen_requests_until,
                         log_match_data=True,
+                        match_probability_file=match_probability_file,
                         base_log_dir=base_log_dir)
     # env = Monitor(env)
     env = StepLogger(env, logfile=f'{base_log_dir}/eval_test_{agent.policy_type()}.csv')
@@ -54,7 +56,7 @@ def run_test(seed, agent: TestAgent, reward_weights, base_log_dir, t_slot_to_tes
     collector.collect(n_step=t_slot_to_test)
 
 
-def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, repeat=20):
+def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, match_probability_file, repeat=20):
     run_saved_model_dir_pattern = re.compile(r".*[/\\](?P<run_id>\d+)[/\\]saved_models$")
     saved_policy_pattern = re.compile(r"policy-(?P<year>\d+)\.pth")
 
@@ -79,9 +81,10 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
     for run in run_policy_dirs:
         remote_ids.append(run_test.remote(seed=seed,
                                           agent=DqnAgent(model_file=run.policy_filepath),
-                                          t_slot_to_test=evaluation_t_slot + 12 * 6,
+                                          t_slot_to_test=evaluation_t_slot + 6 * 5,
                                           reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
                                           gen_requests_until=evaluation_t_slot,
+
                                           base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}")))
 
         # RANDOM
@@ -89,8 +92,9 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
     for run_id, rnd_run in itertools.product(unique_run_ids, range(repeat)):
         remote_ids.append(run_test.remote(seed=seed,
                                           agent=RandomAgent(),
-                                          t_slot_to_test=evaluation_t_slot + 12 * 6,
+                                          t_slot_to_test=evaluation_t_slot + 6 * 5,
                                           reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
+                                          match_probability_file=match_probability_file,
                                           gen_requests_until=evaluation_t_slot,
                                           base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}")))
     return remote_ids
@@ -104,13 +108,14 @@ def grouper(iterable, n, fillvalue=None):
 def run_comparison_main():
     parser = argparse.ArgumentParser(description="DRL MOBA Policy comparative evaluation")
     parser.add_argument('experiment_tag', type=str, help='A name of the training experiment setting')
-    # parser.add_argument('evaluation_tag', type=str, help='A name of this evaluation setting')
+    parser.add_argument('--evaluation-tag', type=str, default='', help='A name of this evaluation setting')
     parser.add_argument('--num-scenarios', type=int, default=10, help="Number of scenarios ")
     parser.add_argument('--rnd-repeats', type=int, default=10, help="Number of random repetitions")
     parser.add_argument('-j', type=int, default=os.cpu_count() - 4, help='Number of parallel processes', dest='num_processes')
     parser.add_argument('-g', type=int, default=4, help='Number of parallel gurobi processes', dest='num_gurobi_processes')
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
+    parser.add_argument('--match-probability-file', default=None)
     cli_args = parser.parse_args()
 
     num_ray_processes = cli_args.num_processes
@@ -118,7 +123,7 @@ def run_comparison_main():
 
     ray.init(num_cpus=num_ray_processes)
 
-    evaluation_tag = f'eval-{cli_args.experiment_tag}'
+    evaluation_tag = f'eval-{cli_args.experiment_tag}-{cli_args.evaluation_tag}'
     base_log_dir = os.path.join('out_eval', evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
 
@@ -135,6 +140,7 @@ def run_comparison_main():
                                                            experiment_tag=cli_args.experiment_tag,
                                                            evaluation_t_slot=cli_args.test_t_slot,
                                                            base_log_dir=base_log_dir,
+                                                           match_probability_file=cli_args.match_probability_file,
                                                            repeat=cli_args.rnd_repeats))
     # wait until finish
     ray.get(remote_ids)

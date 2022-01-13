@@ -73,9 +73,9 @@ def main(cli_args):
     state_shape = env.observation_space.shape or env.observation_space.n
     action_shape = env.action_space.shape or env.action_space.n
     net = Net(state_shape, action_shape)
-    optim = torch.optim.Adam(net.parameters(), lr=1e-4)
+    optim = torch.optim.Adam(net.parameters(), lr=0.0005)
 
-    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.99, estimation_step=1, target_update_freq=2000)
+    policy = ts.policy.DQNPolicy(net, optim, discount_factor=0.9, estimation_step=1, target_update_freq=2000)
 
     train_collector = ts.data.Collector(policy, env, ts.data.PrioritizedReplayBuffer(100000, alpha=0.6, beta=0.2))
     # train_collector.collect(n_step=6)
