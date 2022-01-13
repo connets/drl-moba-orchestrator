@@ -84,7 +84,7 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
                                           t_slot_to_test=evaluation_t_slot + 6 * 5,
                                           reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
                                           gen_requests_until=evaluation_t_slot,
-
+                                          match_probability_file=match_probability_file,
                                           base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}")))
 
         # RANDOM
@@ -151,6 +151,7 @@ def run_comparison_main():
         # COMPUTE OPTIMAL SOLUTION
         remote_ids = [compute_optimal_solution_wrapper.remote(seed,
                                                               evaluation_t_slot=cli_args.test_t_slot,
+                                                              match_probability_file= cli_args.match_probability_file,
                                                               base_log_dir=base_log_dir, max_threads=max_gurobi_threads)
                       for seed in seed_group if seed is not None]
         # wait until finish
