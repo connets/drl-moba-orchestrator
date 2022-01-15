@@ -56,7 +56,7 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
     collector.collect(n_step=t_slot_to_test)
 
 
-def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, match_probability_file, repeat=20):
+def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, match_probability_file, eval_random_policy, rnd_repeat=20):
     run_saved_model_dir_pattern = re.compile(r".*[/\\](?P<run_id>\d+)[/\\]saved_models$")
     saved_policy_pattern = re.compile(r"policy-(?P<year>\d+)\.pth")
 
@@ -89,14 +89,16 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
 
         # RANDOM
     # for run_id, rnd_run in progressbar.progressbar(list(itertools.product(unique_run_ids, range(repeat))), prefix='Random policy '):
-    for run_id, rnd_run in itertools.product(unique_run_ids, range(repeat)):
-        remote_ids.append(run_test.remote(seed=seed,
-                                          agent=RandomAgent(),
-                                          t_slot_to_test=evaluation_t_slot + 6 * 5,
-                                          reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
-                                          match_probability_file=match_probability_file,
-                                          gen_requests_until=evaluation_t_slot,
-                                          base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}")))
+    if eval_random_policy:
+        print('Random policy evaluation')
+        for run_id, rnd_run in itertools.product(unique_run_ids, range(rnd_repeat)):
+            remote_ids.append(run_test.remote(seed=seed,
+                                              agent=RandomAgent(),
+                                              t_slot_to_test=evaluation_t_slot + 6 * 5,
+                                              reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
+                                              match_probability_file=match_probability_file,
+                                              gen_requests_until=evaluation_t_slot,
+                                              base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}")))
     return remote_ids
 
 
@@ -115,6 +117,7 @@ def run_comparison_main():
     parser.add_argument('-g', type=int, default=4, help='Number of parallel gurobi processes', dest='num_gurobi_processes')
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
+    parser.add_argument('--random_policy', action='store_true')
     parser.add_argument('--match-probability-file', default=None)
     cli_args = parser.parse_args()
 
@@ -141,7 +144,8 @@ def run_comparison_main():
                                                            evaluation_t_slot=cli_args.test_t_slot,
                                                            base_log_dir=base_log_dir,
                                                            match_probability_file=cli_args.match_probability_file,
-                                                           repeat=cli_args.rnd_repeats))
+                                                           rnd_repeat=cli_args.rnd_repeats,
+                                                           eval_random_policy=cli_args.random_policy))
     # wait until finish
     ray.get(remote_ids)
 

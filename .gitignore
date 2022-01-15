@@ -168,6 +168,7 @@ r.py
 /out/
 /out-*/
 /out_*/
+simulation_configs/*
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/
