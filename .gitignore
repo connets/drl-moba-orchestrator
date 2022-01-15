@@ -168,7 +168,7 @@ r.py
 /out/
 /out-*/
 /out_*/
-simulation_configs/*
+simulation_configs/*.yaml
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/
