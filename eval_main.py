@@ -14,25 +14,6 @@ from mec_moba.envs.utils.stepLoggerWrapper import StepLogger
 from mec_moba.policy_models.mlp_policy import MLPNet
 
 
-class Net(nn.Module):
-    def __init__(self, state_shape, action_shape):
-        super().__init__()
-        layer_dim = pow(2, math.floor(math.log2(max(np.prod(state_shape), np.prod(action_shape)))))
-        self.model = nn.Sequential(
-            nn.Linear(np.prod(state_shape), layer_dim), nn.ReLU(inplace=True),
-            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
-            nn.Linear(layer_dim, layer_dim), nn.ReLU(inplace=True),
-            nn.Linear(layer_dim, np.prod(action_shape)),
-        )
-
-    def forward(self, obs, state=None, info={}):
-        if not isinstance(obs, torch.Tensor):
-            obs = torch.tensor(obs, dtype=torch.float)
-        batch = obs.shape[0]
-        logits = self.model(obs.view(batch, -1))
-        return logits, state
-
-
 class TestAgent:
     def __init__(self):
         pass
@@ -50,17 +31,19 @@ class TestAgent:
 
 
 class DqnAgent(TestAgent):
-    def __init__(self, model_file):
+    def __init__(self, model_file, layer_dim=None, num_layers=2):
         super().__init__()
         self.model_file = model_file
+        self.layer_dim = layer_dim
+        self.num_layers = num_layers
 
         # self.model.load_state_dict(state_dict=)
 
     def initialize(self, env):
         state_shape = env.observation_space.shape or env.observation_space.n
         action_shape = env.action_space.shape or env.action_space.n
-        net = MLPNet(state_shape, action_shape)
-        self.policy = ts.policy.DQNPolicy(net, None, discount_factor=0.99, estimation_step=1, target_update_freq=2000)
+        net = MLPNet(state_shape, action_shape, layer_dim=self.layer_dim, num_layers=self.num_layers)
+        self.policy = ts.policy.DQNPolicy(net, None)  # discount_factor=0.99, estimation_step=1, target_update_freq=2000)
         self.policy.load_state_dict(torch.load(self.model_file))
         self.policy.eval()
         self.policy.set_eps(0)
@@ -106,7 +89,6 @@ def run_test(seed, agent: TestAgent, base_log_dir, t_slot_to_test=1008, gen_requ
     collector.collect(n_step=t_slot_to_test)
 
 
-
 if __name__ == '__main__':
     seeds = [1000]
 
@@ -119,4 +101,4 @@ if __name__ == '__main__':
 
         run_test(seed, dqn_agent, t_slot_to_test=144 + 6 * 5,
                  gen_requests_until=144, base_log_dir=f'logs/{seed}',
-                 match_probability_file=None) #'data/match_probability_uniform.csv')
+                 match_probability_file=None)  # 'data/match_probability_uniform.csv')

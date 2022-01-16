@@ -28,7 +28,9 @@ grid_search_params = ['buffer_size',
                       'train_eps',
                       'batch_size',
                       'learning_rate',
-                      'reward_weights']
+                      'reward_weights',
+                      'layer_dim',
+                      'num_layers', ]
 
 run_parameter_fields_to_save = ['run_id', 'train_years', 'seed'] + grid_search_params
 extra_run_parameter_fields = ['base_dir']  # these extras fields are needed internally but are not saved
@@ -44,7 +46,9 @@ sqlite_field_type_dict = {'run_id': 'text',
                           'train_eps': 'real',
                           'batch_size': 'integer',
                           'learning_rate': 'real',
-                          'reward_weights': 'text'
+                          'reward_weights': 'text',
+                          'layer_dim': 'integer',
+                          'num_layers': 'integer',
                           }
 
 assert all(map(lambda k: k in sqlite_field_type_dict, run_parameter_fields_to_save))
@@ -104,7 +108,7 @@ class Experiment:
 
         state_shape = train_env.observation_space.shape or train_env.observation_space.n
         action_shape = train_env.action_space.shape or train_env.action_space.n
-        net = MLPNet(state_shape, action_shape)
+        net = MLPNet(state_shape, action_shape, run_params.layer_dim, run_params.num_layers)
         optim = torch.optim.Adam(net.parameters(), lr=run_params.learning_rate)
 
         self.policy = ts.policy.DQNPolicy(net, optim, discount_factor=run_params.gamma,
@@ -114,7 +118,7 @@ class Experiment:
         self.train_collector = ts.data.Collector(self.policy, train_env, replay_buffer)
         self.test_collector = ts.data.Collector(self.policy, test_env)
         self.tb_logger = TensorboardLogger(SummaryWriter(os.path.join(tb_log_dir, run_params.run_id)))
-        print(f'Created run id {run_params.run_id} object')
+        print(f'Created run id {run_params.run_id} object\n{run_params}')
 
     def is_done(self):
         return self.current_training_year >= self.run_params.train_years
