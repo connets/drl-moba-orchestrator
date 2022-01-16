@@ -50,7 +50,7 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
                 # fps = round(1000 / max([(delay_dict[(t % 1008, bs[0], f)]) for bs in game_index[n]]))
                 # self.delay_dict[(self.environment.epoch_t_slot, bs, mec)]
                 rtt = max(delay_dict[t, bs, f] for bs in games[n].get_base_stations())
-                cost_c[n, f, t] = 5 - games[n].compute_QoS(rtt)
+                cost_c[n, f, t] = (5 - games[n].compute_QoS(rtt)) / 5
 
     # [x for x in game_request_timeslot_sample]
     delta = MATCH_DURATION
@@ -61,7 +61,7 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
     # Create a new model
     m = gp.Model("DQN")
     m.Params.LogToConsole = 1
-    m.Params.MIPGap = 0.01
+    m.Params.MIPGap = 0.005
     m.Params.TimeLimit = 3000
     m.Params.Threads = max_threads
 
@@ -74,7 +74,7 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
     # Set objective
     m.setObjective(sum(sum(sum([cost_c[i, j, t] * x[i, j, t] for j in range(F)]) for i in range(N)) for t in range(T))
                    + sum(sum([1 * v[j, t] for j in range(F)]) for t in range(T))
-                   + sum(sum([1 * y[i, t] for i in range(N)]) for t in range(T))
+                   + sum(sum([1 / 5 * y[i, t] for i in range(N)]) for t in range(T))
                    + sum(sum(w[i, t] * s[i, t] for i in range(N)) for t in range(T)),
                    gp.GRB.MINIMIZE)
 
@@ -120,31 +120,32 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
     else:
         print('success', m.objVal)
-        print('Qos component:', sum(sum(sum([cost_c[i, j, t] * x[i, j, t].x for j in range(F)]) for i in range(N)) for t in range(T)))
-        print('Op component:', sum(sum([1 * v[j, t].x for j in range(F)]) for t in range(T)))
-        print('Mig component:', sum(sum([1 * y[i, t].x for i in range(N)]) for t in range(T)))
-        print('Sched component:', sum(sum(w[i, t] * s[i, t].x for i in range(N)) for t in range(T)))
+        print('Qos component:', sum(sum(sum([cost_c[i, j, t] * round(x[i, j, t].x) for j in range(F)]) for i in range(N)) for t in range(T)))
+        print('Op component:', sum(sum([1 * round(v[j, t].x) for j in range(F)]) for t in range(T)))
+        print('Mig component:', sum(sum([1 / 5 * round(y[i, t].x) for i in range(N)]) for t in range(T)))
+        print('Sched component:', sum(sum(w[i, t] * round(s[i, t].x) for i in range(N)) for t in range(T)))
 
         with open(f'{base_log_dir}/{SEED}/opt/x.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
             for t in range(T):
                 for j in range(F):
                     for i in range(N):
-                        if x[i][j][t].x > 0:
+                        if round(x[i][j][t].x) > 0:
                             writer.writerow([t, j, i, x[i][j][t].x])
 
         with open(f'{base_log_dir}/{SEED}/opt/s.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
+            writer.writerow(['t_slot', 'match_id', 'value', 'sigma'])
             for t in range(T):
                 for i in range(N):
-                    if s[i, t].x > 0:
-                        writer.writerow([t, i, s[i, t].x])
+                    if round(s[i, t].x) > 0:
+                        writer.writerow([t, i, s[i, t].x, request_time_sigma[i]])
 
         with open(f'{base_log_dir}/{SEED}/opt/y.csv', 'w', newline='') as fd:
             writer = csv.writer(fd)
             for t in range(T):
                 for i in range(N):
-                    if y[i, t].x > 0:
+                    if round(y[i, t].x) > 0:
                         writer.writerow([t, i, y[i, t].x])
 
     with open(f'{base_log_dir}/{SEED}/opt/sigma.csv', 'w', newline='') as f_d:
@@ -153,5 +154,5 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
 
 if __name__ == '__main__':
-    for seed in [1000]:
+    for seed in [1313441478]:
         compute_optimal_solution(seed)
