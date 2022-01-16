@@ -36,3 +36,7 @@ class StepLogger(gym.Wrapper):
         self._log(observation, action, reward, next_observation)
 
         return next_observation, reward, week_end, metadata
+
+    def close(self):
+        self.env.close()
+        self.step_logger.close()

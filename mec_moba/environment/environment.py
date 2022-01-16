@@ -282,11 +282,11 @@ class Environment:
         blocked = [x for x in games if x not in selected]
         return selected, blocked
 
-    # "Public" Methods called from main loop
-    def enqueue_new_match_requests(self):
-        match_requests = self.match_generator.get_match_requests(t_slot=self._epoch_t_slot)
-        self.match_controller.enqueue_match_requests(match_requests)
-        # for match in match_requests:
+    # # "Public" Methods called from main loop
+    # def enqueue_new_match_requests(self):
+    #     match_requests = self.match_generator.get_match_requests(t_slot=self._epoch_t_slot)
+    #     self.match_controller.enqueue_match_requests(match_requests)
+    #     # for match in match_requests:
 
     def implement_action(self, action_result: ActionResultsInstructions):
         # pre_running = len(self.match_controller.running)

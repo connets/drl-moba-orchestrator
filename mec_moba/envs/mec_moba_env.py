@@ -8,6 +8,7 @@ import itertools
 from mec_moba.environment.action_controller import DqnAction
 from mec_moba.environment.environment import Environment
 import mec_moba.environment.action_controller as action_controller
+from mec_moba.environment.utils.logging_utils import close_all_logs
 
 
 class MecMobaDQNEvn(gym.Env):
@@ -83,15 +84,8 @@ class MecMobaDQNEvn(gym.Env):
     def render(self, mode="human"):
         return
 
-    #     pass
-    #     # env_state = np.zeros((10 + 3, 12))
-    #     # t_slot_state = self._internal_env.get_time_slot_state()
-    #     # for i, f_l in enumerate(t_slot_state.facility_utilization):
-    #     #     f_l = max(0, int(round((f_l * 10))))
-    #     #     env_state[i, :f_l - 1] = 1
-    #
-    #     # for r in reversed(range(env_state.shape[0])):
-    #     #     print("".join(["*" if x == 1 else " " for x in env_state[r, :]]))
+    def close(self):
+        close_all_logs()
 
     def seed(self, seed=None):
         self._rng_seed = seed

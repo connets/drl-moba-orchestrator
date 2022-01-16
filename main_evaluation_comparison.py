@@ -54,6 +54,7 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
     agent.initialize(env)
     collector = ts.data.Collector(agent.policy, env)
     collector.collect(n_step=t_slot_to_test)
+    env.close()
 
 
 def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, match_probability_file, eval_random_policy, rnd_repeat=20):
