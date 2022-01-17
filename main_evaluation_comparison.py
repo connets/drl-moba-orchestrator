@@ -8,7 +8,6 @@ import numpy as np
 import re
 
 import pandas as pd
-import progressbar
 from gym.wrappers import FlattenObservation
 
 from mec_moba.envs import MecMobaDQNEvn
@@ -25,6 +24,17 @@ def get_reward_weights_from_run_id(run_id, experiment_tag):
     db = sqlite3.connect(os.path.join('out', experiment_tag, 'experiments.db'))
     cur = db.cursor().execute(f"SELECT reward_weights FROM main.experiments WHERE run_id = {run_id}")
     return tuple(map(float, cur.fetchone()[0][1:-1].split(',')))
+
+
+def create_DQN_agent(run_info: RunPolicyInfo, experiment_tag):
+    db = sqlite3.connect(os.path.join('out', experiment_tag, 'experiments.db'))
+    run_train_parameters = pd.read_sql(f"SELECT reward_weights FROM main.experiments WHERE run_id = {run_info.run_id}", db)
+    if 'layer_dim' in run_train_parameters.columns and 'num_layers' in run_train_parameters.columns:
+        return DqnAgent(model_file=run_info.policy_filepath,
+                        layer_dim=run_train_parameters.iloc[0].layer_dim,
+                        num_layers=run_train_parameters.iloc[0].num_layers)
+
+    return DqnAgent(model_file=run_info.policy_filepath)
 
 
 @ray.remote
@@ -81,7 +91,7 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
     # for run in progressbar.progressbar(run_policy_dirs, prefix='DQN policy '):
     for run in run_policy_dirs:
         remote_ids.append(run_test.remote(seed=seed,
-                                          agent=DqnAgent(model_file=run.policy_filepath),
+                                          agent=create_DQN_agent(run, experiment_tag),  # DqnAgent(model_file=run.policy_filepath),
                                           t_slot_to_test=evaluation_t_slot + 6 * 5,
                                           reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
                                           gen_requests_until=evaluation_t_slot,
