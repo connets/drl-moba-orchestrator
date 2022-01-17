@@ -43,8 +43,10 @@ class DqnAgent(TestAgent):
         state_shape = env.observation_space.shape or env.observation_space.n
         action_shape = env.action_space.shape or env.action_space.n
         net = MLPNet(state_shape, action_shape, layer_dim=self.layer_dim, num_layers=self.num_layers)
+        # print(net.model)
+        # print(self.layer_dim, self.num_layers, torch.load(self.model_file).keys())
         self.policy = ts.policy.DQNPolicy(net, None)  # discount_factor=0.99, estimation_step=1, target_update_freq=2000)
-        self.policy.load_state_dict(torch.load(self.model_file))
+        self.policy.load_state_dict(torch.load(self.model_file), strict=False)
         self.policy.eval()
         self.policy.set_eps(0)
 
