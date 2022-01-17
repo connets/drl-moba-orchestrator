@@ -29,7 +29,6 @@ def get_reward_weights_from_run_id(run_id, experiment_tag):
 def create_DQN_agent(run_info: RunPolicyInfo, experiment_tag):
     db = sqlite3.connect(os.path.join('out', experiment_tag, 'experiments.db'))
     run_train_parameters = pd.read_sql(f"SELECT * FROM main.experiments WHERE run_id = {run_info.run_id}", db)
-    print(run_train_parameters.columns)
     if 'layer_dim' in run_train_parameters.columns and 'num_layers' in run_train_parameters.columns:
         return DqnAgent(model_file=run_info.policy_filepath,
                         layer_dim=run_train_parameters.iloc[0].layer_dim,
