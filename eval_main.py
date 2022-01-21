@@ -94,12 +94,13 @@ def run_test(seed, agent: TestAgent, base_log_dir, t_slot_to_test=1008, gen_requ
 if __name__ == '__main__':
     seeds = [1000]
 
-    reward_weights = (0.25, 0.5, 1)  # , 0, 0, 0)
+    #reward_weights = (0.25, 0.5, 1)  # , 0, 0, 0)
+    reward_weights = [1, 1, 0.25]
 
     for seed in seeds:
         os.makedirs(f'logs/{seed}', exist_ok=True)
 
-        dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2022_01_10_6000matches_6ts/4/saved_models/policy-15.pth')
+        dqn_agent = DqnAgent(model_file='out/dqn_icdcs22_2022_01_10_6000matches_6ts_rw_weight_FULL/22/saved_models/policy-0.pth')
 
         run_test(seed, dqn_agent, t_slot_to_test=144 + 6 * 5,
                  gen_requests_until=144, base_log_dir=f'logs/{seed}',

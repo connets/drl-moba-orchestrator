@@ -154,5 +154,5 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
 
 if __name__ == '__main__':
-    for seed in [1313441478]:
+    for seed in [1000]:
         compute_optimal_solution(seed)

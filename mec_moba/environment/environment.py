@@ -221,11 +221,11 @@ class Environment:
         else:
             split_rewards = [reward_comp[rw_cmp][1] for rw_cmp in reward_comp_order]
 
+        worst_value_sum = [w * v for (_, v), w, rw_cmp_value in zip(reward_comp.values(), self.reward_weights, split_rewards)
+                           if rw_cmp_value is not None]
+        worst_value_sum = abs(sum(worst_value_sum))
+        # FILTER NONEs
         split_rewards = [w * v for v, w in zip(split_rewards, self.reward_weights) if v is not None]
-
-        worst_value_sum = abs(sum(
-            w * v for (_, v), w in zip(reward_comp.values(), self.reward_weights)))  # the sum is negative so I use abs
-        # reward = (sum(split_rewards) + worst_value_sum) / worst_value_sum
         reward = sum(split_rewards)
         if self.normalize_reward:
             reward /= worst_value_sum
