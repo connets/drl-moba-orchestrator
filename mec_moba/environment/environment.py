@@ -164,10 +164,15 @@ class Environment:
     def default_reward_weights():
         return tuple([1] * len(reward_comp_order))
 
-    def __init__(self, reward_weights, gen_requests_until=None, match_probability_file=None, normalize_reward=True):
+    def __init__(self, reward_weights, gen_requests_until=None,
+                 match_probability_file=None,
+                 n_games_per_epoch=None,
+                 normalize_reward=True):
         self.physical_network: PhysicalNetwork = PhysicalNetwork(self)
         self.match_controller: MatchController = MatchController(self, self.physical_network)
-        self.match_generator = GameGenerator(gen_requests_until, match_probability_file=match_probability_file)
+        self.match_generator = GameGenerator(gen_requests_until,
+                                             match_probability_file=match_probability_file,
+                                             n_games_per_epoch=n_games_per_epoch)
         self.reward_weights = reward_weights
         # self.gen_requests_until = gen_requests_until
         self.normalize_reward = normalize_reward

@@ -47,7 +47,7 @@ def compute_optimal_solution_wrapper(seed, evaluation_t_slot, base_log_dir, matc
 
 
 @ray.remote
-def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, base_log_dir, t_slot_to_test=1008, gen_requests_until=1008, ):
+def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, base_log_dir, num_weekly_matches, t_slot_to_test=1008, gen_requests_until=1008, ):
     # print(reward_weights, base_log_dir)
     os.makedirs(base_log_dir, exist_ok=True)
 
@@ -55,6 +55,7 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
                         gen_requests_until=gen_requests_until,
                         log_match_data=True,
                         match_probability_file=match_probability_file,
+                        n_games_per_epoch=num_weekly_matches,
                         base_log_dir=base_log_dir)
     # env = Monitor(env)
     env = StepLogger(env, logfile=f'{base_log_dir}/eval_test_{agent.policy_type()}.csv')
@@ -67,7 +68,8 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
     env.close()
 
 
-def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir, match_probability_file, eval_random_policy, rnd_repeat=20):
+def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir,
+                                     num_weekly_matches, match_probability_file, eval_random_policy, rnd_repeat=20):
     run_saved_model_dir_pattern = re.compile(r".*[/\\](?P<run_id>\d+)[/\\]saved_models$")
     saved_policy_pattern = re.compile(r"policy-(?P<year>\d+)\.pth")
 
@@ -94,6 +96,7 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
                                           agent=create_DQN_agent(run, experiment_tag),  # DqnAgent(model_file=run.policy_filepath),
                                           t_slot_to_test=evaluation_t_slot + 6 * 5,
                                           reward_weights=get_reward_weights_from_run_id(run.run_id, experiment_tag),
+                                          num_weekly_matches=num_weekly_matches,
                                           gen_requests_until=evaluation_t_slot,
                                           match_probability_file=match_probability_file,
                                           base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}")))
@@ -130,6 +133,7 @@ def run_comparison_main():
     parser.add_argument('--seeds-file', default=None)
     parser.add_argument('--random_policy', action='store_true')
     parser.add_argument('--match-probability-file', default=None)
+    parser.add_argument('--num-weekly-matches', type=int, default=6000)
     cli_args = parser.parse_args()
 
     num_ray_processes = cli_args.num_processes
@@ -154,6 +158,7 @@ def run_comparison_main():
                                                            experiment_tag=cli_args.experiment_tag,
                                                            evaluation_t_slot=cli_args.test_t_slot,
                                                            base_log_dir=base_log_dir,
+                                                           num_weekly_matches=cli_args.num_weekly_matches,
                                                            match_probability_file=cli_args.match_probability_file,
                                                            rnd_repeat=cli_args.rnd_repeats,
                                                            eval_random_policy=cli_args.random_policy))

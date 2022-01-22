@@ -8,7 +8,9 @@ import pickle
 from mec_moba.environment.matches import GameGenerator
 
 
-def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slot=144, base_log_dir='logs', max_threads=0):
+def compute_optimal_solution(seed, match_probability_file=None,
+                             evaluation_t_slot=144, n_games_per_epoch=6000,
+                             base_log_dir='logs', max_threads=0):
     T_SLOTS = evaluation_t_slot
     T = T_SLOTS + 6  # * 12
     F = 7
@@ -16,7 +18,7 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
     SEED = seed
     # N = int(3500 / 7)
 
-    game_generator = GameGenerator(match_probability_file=match_probability_file)
+    game_generator = GameGenerator(match_probability_file=match_probability_file, n_games_per_epoch=n_games_per_epoch)
     game_generator.set_seed(SEED)
     game_generator.generate_epoch_matches()
 
@@ -155,4 +157,4 @@ def compute_optimal_solution(seed, match_probability_file=None, evaluation_t_slo
 
 if __name__ == '__main__':
     for seed in [1000]:
-        compute_optimal_solution(seed)
+        compute_optimal_solution(seed, n_games_per_epoch=7200)

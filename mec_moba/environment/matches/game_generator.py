@@ -3,7 +3,7 @@ from __future__ import annotations
 # non prendiamo il caso che un utente giochi nello stesso timeslot
 import collections
 import json
-from typing import List
+from typing import List, Optional
 
 from mec_moba.environment.utils.probability_extractor import *
 from mec_moba.environment.utils.user_home_extractor import *
@@ -38,12 +38,13 @@ class GameGenerator:
     #             ConfigOption(name=NUM_USER_MATCH, default_value=4, help_string='Number of user per match')
     #             ]
 
-    def __init__(self, gen_requests_until=None, no_overlapping=False, match_probability_file=None):
+    def __init__(self, gen_requests_until=None, no_overlapping=False,
+                 match_probability_file=None, n_games_per_epoch: Optional[int] = None):
         # distribuzione durata di una partita (la durata è in timeslots)
         self.duration = defaults[MAX_DURATION_PARAM]
         self.max_wait = defaults[MAX_WAITING_TIME_PARAM]
         self.exit_time = defaults[QUEUE_EXIT_TIME_PARAM]
-        self.n_games_per_epoch = defaults[NUM_GAMES_PER_EPOCH_PARAM]
+        self.n_games_per_epoch = defaults[NUM_GAMES_PER_EPOCH_PARAM] if n_games_per_epoch is None else n_games_per_epoch
 
         # numero di utenti per partita/servizio
         self.n_users = defaults[NUM_USER_MATCH]
