@@ -38,10 +38,11 @@ def create_DQN_agent(run_info: RunPolicyInfo, experiment_tag):
 
 
 @ray.remote
-def compute_optimal_solution_wrapper(seed, evaluation_t_slot, base_log_dir, match_probability_file, max_threads):
+def compute_optimal_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches, base_log_dir, match_probability_file, max_threads):
     compute_optimal_solution(seed,
                              evaluation_t_slot=evaluation_t_slot,
                              base_log_dir=base_log_dir,
+                             n_games_per_epoch=num_weekly_matches,
                              match_probability_file=match_probability_file,
                              max_threads=max_threads)
 
@@ -171,6 +172,7 @@ def run_comparison_main():
         # COMPUTE OPTIMAL SOLUTION
         remote_ids = [compute_optimal_solution_wrapper.remote(seed,
                                                               evaluation_t_slot=cli_args.test_t_slot,
+                                                              num_weekly_matches=cli_args.num_weekly_matches,
                                                               match_probability_file=cli_args.match_probability_file,
                                                               base_log_dir=base_log_dir, max_threads=max_gurobi_threads)
                       for seed in seed_group if seed is not None]
