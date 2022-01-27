@@ -33,7 +33,7 @@ grid_search_params = ['buffer_size',
                       'num_layers', ]
 
 run_parameter_fields_to_save = ['run_id', 'train_years', 'seed'] + grid_search_params
-extra_run_parameter_fields = ['base_dir']  # these extras fields are needed internally but are not saved
+extra_run_parameter_fields = ['base_dir', 'match_prob_file']  # these extras fields are needed internally but are not saved
 run_parameter_fields = run_parameter_fields_to_save + extra_run_parameter_fields
 
 sqlite_field_type_dict = {'run_id': 'text',
@@ -100,7 +100,8 @@ class Experiment:
 
         tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
 
-        train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
+        train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights,
+                                  match_probability_file=run_params.match_prob_file)
         train_env = FlattenObservation(train_env)
 
         test_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)
@@ -165,8 +166,12 @@ def training_processes(experiments_group):
         experiment_to_do_idx = (experiment_to_do_idx + 1) % len(experiments_obj)
 
 
-def _generate_run_parameter(run_id, base_dir, train_years, seed, grid_params_dict):
-    d = {'run_id': str(run_id), 'base_dir': base_dir, 'train_years': train_years, 'seed': seed}
+def _generate_run_parameter(run_id, base_dir, match_prob_file, train_years, seed, grid_params_dict):
+    d = {'run_id': str(run_id),
+         'base_dir': base_dir,
+         'train_years': train_years,
+         'seed': seed,
+         'match_prob_file': match_prob_file}
     d.update(**grid_params_dict)
 
     return RunParameters(**d)
@@ -177,6 +182,7 @@ def main():
     parser.add_argument('conf_file', type=str, help='Grid search configurator file (.yaml)')
     parser.add_argument('experiment_tag', type=str, help='A name of this experiment setting')
     parser.add_argument('--seed', type=int, default=-1, help="Seed number. -1 or negative values means random seed ")
+    parser.add_argument('--match-probability-file', default=None)
     parser.add_argument('-j', type=int, default=os.cpu_count() - 1, help='Number of parallel processes', dest='num_processes')
     parser.add_argument('--train-years', type=int, default=10, help="Number of training weeks")
     cli_args = parser.parse_args()
@@ -204,6 +210,7 @@ def main():
     experiments = map(lambda v: dict(zip(grid_search_params, v)), experiments)
     experiments = (_generate_run_parameter(run_id=i,
                                            base_dir=base_dir,
+                                           match_prob_file=cli_args.match_probability_file,
                                            train_years=train_years,
                                            seed=seed,
                                            grid_params_dict=e)
