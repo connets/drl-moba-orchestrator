@@ -212,7 +212,8 @@ def run_comparison_main():
                                                               evaluation_t_slot=cli_args.test_t_slot,
                                                               num_weekly_matches=cli_args.num_weekly_matches,
                                                               match_probability_file=cli_args.match_probability_file,
-                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads)
+                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
+                                                              skip_done=cli_args.skip_done)
                       for seed in seed_group if seed is not None]
         # wait until finish
         ray.get(remote_ids)
