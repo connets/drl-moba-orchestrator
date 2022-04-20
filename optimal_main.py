@@ -10,7 +10,10 @@ from mec_moba.environment.matches import GameGenerator
 
 def compute_optimal_solution(seed, match_probability_file=None,
                              evaluation_t_slot=144, n_games_per_epoch=6000,
-                             base_log_dir='logs', max_threads=0):
+                             base_log_dir='logs', max_threads=0, skip_done=False):
+    if skip_done and os.path.exists(f'{base_log_dir}/{seed}/opt'):
+        return
+
     T_SLOTS = evaluation_t_slot
     T = T_SLOTS + 6  # * 12
     F = 7

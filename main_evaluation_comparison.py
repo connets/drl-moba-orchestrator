@@ -13,6 +13,7 @@ from gym.wrappers import FlattenObservation
 from mec_moba.envs import MecMobaDQNEvn
 from mec_moba.envs.utils.stepLoggerWrapper import StepLogger
 from optimal_main import compute_optimal_solution
+from main_mip_online import compute_online_mip_solution
 from eval_main import DqnAgent, RandomAgent, TestAgent
 from collections import namedtuple
 import tianshou as ts
@@ -38,18 +39,40 @@ def create_DQN_agent(run_info: RunPolicyInfo, experiment_tag):
 
 
 @ray.remote
-def compute_optimal_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches, base_log_dir, match_probability_file, max_threads):
+def compute_optimal_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches,
+                                     base_log_dir, match_probability_file, max_threads,
+                                     skip_done):
     compute_optimal_solution(seed,
                              evaluation_t_slot=evaluation_t_slot,
                              base_log_dir=base_log_dir,
                              n_games_per_epoch=num_weekly_matches,
                              match_probability_file=match_probability_file,
-                             max_threads=max_threads)
+                             max_threads=max_threads,
+                             skip_done=skip_done)
 
 
 @ray.remote
-def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, base_log_dir, num_weekly_matches, t_slot_to_test=1008, gen_requests_until=1008, ):
-    # print(reward_weights, base_log_dir)
+def compute_online_mip_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches,
+                                        base_log_dir, match_probability_file, max_threads,
+                                        max_look_ahead_scheduler, skip_done):
+    compute_online_mip_solution(seed=seed,
+                                evaluation_t_slot=evaluation_t_slot,
+                                base_log_dir=base_log_dir,
+                                n_games_per_epoch=num_weekly_matches,
+                                match_probability_file=match_probability_file,
+                                max_threads=max_threads,
+                                max_look_ahead_scheduler=max_look_ahead_scheduler,
+                                skip_done=skip_done)
+
+
+@ray.remote
+def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, base_log_dir,
+             num_weekly_matches, t_slot_to_test=1008, gen_requests_until=1008,
+             skip_done=False):
+    # IF skip_done == True and log file exists --> return immediately
+    if skip_done and os.path.exists(f'{base_log_dir}/eval_test_{agent.policy_type()}.csv'):
+        return
+
     os.makedirs(base_log_dir, exist_ok=True)
 
     env = MecMobaDQNEvn(reward_weights=reward_weights,
@@ -70,7 +93,8 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
 
 
 def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, base_log_dir,
-                                     num_weekly_matches, match_probability_file, eval_random_policy, rnd_repeat=20):
+                                     num_weekly_matches, match_probability_file, eval_random_policy,
+                                     rnd_repeat=20, skip_done=False):
     run_saved_model_dir_pattern = re.compile(r".*[/\\](?P<run_id>\d+)[/\\]saved_models$")
     saved_policy_pattern = re.compile(r"policy-(?P<year>\d+)\.pth")
 
@@ -100,7 +124,8 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
                                           num_weekly_matches=num_weekly_matches,
                                           gen_requests_until=evaluation_t_slot,
                                           match_probability_file=match_probability_file,
-                                          base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}")))
+                                          base_log_dir=os.path.join(base_log_dir, str(seed), 'dqn', f"{run.run_id}_{run.training_year}"),
+                                          skip_done=skip_done))
 
         # RANDOM
     # for run_id, rnd_run in progressbar.progressbar(list(itertools.product(unique_run_ids, range(repeat))), prefix='Random policy '):
@@ -113,7 +138,8 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
                                               reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
                                               match_probability_file=match_probability_file,
                                               gen_requests_until=evaluation_t_slot,
-                                              base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}")))
+                                              base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}"),
+                                              skip_done=skip_done))
     return remote_ids
 
 
@@ -132,9 +158,11 @@ def run_comparison_main():
     parser.add_argument('-g', type=int, default=4, help='Number of parallel gurobi processes', dest='num_gurobi_processes')
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
-    parser.add_argument('--random_policy', action='store_true')
+    parser.add_argument('--random-policy', action='store_true')
     parser.add_argument('--match-probability-file', default=None)
     parser.add_argument('--num-weekly-matches', type=int, default=6000)
+    parser.add_argument('--mip-online-max_look_ahead_scheduler', type=int, default=6, help="Number of look ahead time slots")
+    parser.add_argument('--skip-done', action='store_true')
     cli_args = parser.parse_args()
 
     num_ray_processes = cli_args.num_processes
@@ -162,7 +190,17 @@ def run_comparison_main():
                                                            num_weekly_matches=cli_args.num_weekly_matches,
                                                            match_probability_file=cli_args.match_probability_file,
                                                            rnd_repeat=cli_args.rnd_repeats,
-                                                           eval_random_policy=cli_args.random_policy))
+                                                           eval_random_policy=cli_args.random_policy,
+                                                           skip_done=cli_args.skip_done))
+        # EVALUATE MIP ONLINE
+        remote_ids.append(compute_online_mip_solution_wrapper.remote(seed,
+                                                                     evaluation_t_slot=cli_args.test_t_slot,
+                                                                     num_weekly_matches=cli_args.num_weekly_matches,
+                                                                     match_probability_file=cli_args.match_probability_file,
+                                                                     base_log_dir=base_log_dir,
+                                                                     max_look_ahead_scheduler=cli_args.mip_online_max_look_ahead_scheduler,
+                                                                     max_threads=4, skip_done=cli_args.skip_done))
+
     # wait until finish
     ray.get(remote_ids)
 
