@@ -54,12 +54,14 @@ def solve_t_slot_mip_instance(current_t_slot,
         relative_sched_t = m.scheduled_t_slot - current_t_slot
         for f, t in zip(m.facilities_list, range(relative_sched_t, min(relative_sched_t + match_duration, T))):
             R[f, t] += 1  # unity of capacity that will be used by future match
+    # print(len(running_matches), len(scheduled_matches), N, R)
     # if running instance are not allowed to migrate they use capacity which is not available to other instances
     for m in running_matches:
         time_to_go = match_duration - (current_t_slot - m.scheduled_t_slot)
         for f, t in zip(m.facilities_list, range(0, time_to_go)):
             R[f, t] += 1
 
+    # print(len(running_matches), len(scheduled_matches), N, R)
     m = gp.Model("DQN_online")
     m.Params.LogToConsole = 0
     m.Params.MIPGap = 0.005
@@ -115,21 +117,21 @@ def solve_t_slot_mip_instance(current_t_slot,
     m.optimize()
 
     if not hasattr(m, 'objVal'):
-        print('no solution gurobi, there is a None Type')
+        print('no solution gurobi, there is a None Type', current_t_slot)
 
     else:
         # return scheduling plan
         new_matches_scheduled = []
         for i in range(N):
-            match_id = new_matches[i].match_id
             for t in range(T):
-                if s[i][t].x > 0:
+                if round(s[i][t].x) > 0:
                     schedule_t_slot = t + current_t_slot  # to absolute
                     facilities_list = []
                     for tt in range(t, t + match_duration):
                         selected_f = []  # for test
                         for j in range(F):
-                            if round(x[i][j][t].x) > 0:
+                            if round(x[i][j][tt].x) > 0:
+                                #print(i,j,tt)
                                 selected_f.append(j)
                         assert len(selected_f) == 1
                         facilities_list.extend(selected_f)
@@ -199,14 +201,15 @@ def compute_online_mip_solution(seed, match_probability_file=None,
         scheduled_matches = tmp_scheduled_matches
 
         # running --> next step
-        for m in running_matches:
-            m._replace(facilities_list=m.facilities_list[1:] if len(m.facilities_list) > 1 else [])
+        running_matches = [m._replace(facilities_list=m.facilities_list[1:] if len(m.facilities_list) > 1 else []) for m in running_matches]
+
         # running --> finished
         running_matches = list(filter(lambda m: len(m.facilities_list) > 0, running_matches))
+        # print(len(running_matches), running_matches[0])
 
     fd.close()
 
 
 if __name__ == '__main__':
     for seed in [1000]:
-        compute_online_mip_solution(seed)  # , n_games_per_epoch=7200)
+        compute_online_mip_solution(seed, n_games_per_epoch=6600)  # , n_games_per_epoch=7200)
