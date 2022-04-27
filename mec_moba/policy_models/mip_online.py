@@ -5,10 +5,9 @@ import numpy as np
 from mec_moba.environment.utils.delay_exctractor import *
 import gurobipy as gp
 import csv
-import pickle
 from collections import namedtuple
 
-from mec_moba.environment.matches import GameGenerator, Game
+from mec_moba.environment.matches import GameGenerator
 
 # RunPolicyInfo = namedtuple('RunPolicyInfo', ['run_id', 'training_year', 'policy_filepath'])
 NewMatches = namedtuple('NetMatches', ['match_id', 'match_obj'])
@@ -131,7 +130,7 @@ def solve_t_slot_mip_instance(current_t_slot,
                         selected_f = []  # for test
                         for j in range(F):
                             if round(x[i][j][tt].x) > 0:
-                                #print(i,j,tt)
+                                # print(i,j,tt)
                                 selected_f.append(j)
                         assert len(selected_f) == 1
                         facilities_list.extend(selected_f)
@@ -208,8 +207,3 @@ def compute_online_mip_solution(seed, match_probability_file=None,
         # print(len(running_matches), running_matches[0])
 
     fd.close()
-
-
-if __name__ == '__main__':
-    for seed in [1000]:
-        compute_online_mip_solution(seed, n_games_per_epoch=6600)  # , n_games_per_epoch=7200)

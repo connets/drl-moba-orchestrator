@@ -13,7 +13,8 @@ from gym.wrappers import FlattenObservation
 from mec_moba.envs import MecMobaDQNEvn
 from mec_moba.envs.utils.stepLoggerWrapper import StepLogger
 from optimal_main import compute_optimal_solution
-from main_mip_online import compute_online_mip_solution
+from mec_moba.policy_models.mip_online import compute_online_mip_solution
+from mec_moba.policy_models.best_fit import compute_best_fit_solution
 from eval_main import DqnAgent, RandomAgent, TestAgent
 from collections import namedtuple
 import tianshou as ts
@@ -63,6 +64,16 @@ def compute_online_mip_solution_wrapper(seed, evaluation_t_slot, num_weekly_matc
                                 max_threads=max_threads,
                                 max_look_ahead_scheduler=max_look_ahead_scheduler,
                                 skip_done=skip_done)
+
+
+@ray.remote
+def compute_best_fit_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches,
+                                      base_log_dir, match_probability_file, skip_done):
+    compute_best_fit_solution(seed=seed,
+                              evaluation_t_slot=evaluation_t_slot,
+                              base_log_dir=base_log_dir,
+                              n_games_per_epoch=num_weekly_matches,
+                              match_probability_file=match_probability_file, skip_done=skip_done)
 
 
 @ray.remote
@@ -159,6 +170,8 @@ def run_comparison_main():
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
     parser.add_argument('--random-policy', action='store_true')
+    parser.add_argument('--mip-online', action='store_true')
+    parser.add_argument('--best-fit', action='store_true')
     parser.add_argument('--match-probability-file', default=None)
     parser.add_argument('--num-weekly-matches', type=int, default=6000)
     parser.add_argument('--mip-online-max_look_ahead_scheduler', type=int, default=6, help="Number of look ahead time slots")
@@ -193,13 +206,21 @@ def run_comparison_main():
                                                            eval_random_policy=cli_args.random_policy,
                                                            skip_done=cli_args.skip_done))
         # EVALUATE MIP ONLINE
-        remote_ids.append(compute_online_mip_solution_wrapper.remote(seed,
-                                                                     evaluation_t_slot=cli_args.test_t_slot,
-                                                                     num_weekly_matches=cli_args.num_weekly_matches,
-                                                                     match_probability_file=cli_args.match_probability_file,
-                                                                     base_log_dir=base_log_dir,
-                                                                     max_look_ahead_scheduler=cli_args.mip_online_max_look_ahead_scheduler,
-                                                                     max_threads=4, skip_done=cli_args.skip_done))
+        if cli_args.mip_online:
+            remote_ids.append(compute_online_mip_solution_wrapper.remote(seed,
+                                                                         evaluation_t_slot=cli_args.test_t_slot,
+                                                                         num_weekly_matches=cli_args.num_weekly_matches,
+                                                                         match_probability_file=cli_args.match_probability_file,
+                                                                         base_log_dir=base_log_dir,
+                                                                         max_look_ahead_scheduler=cli_args.mip_online_max_look_ahead_scheduler,
+                                                                         max_threads=4, skip_done=cli_args.skip_done))
+
+        if cli_args.best_fit:
+            remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
+                                                                       num_weekly_matches=cli_args.num_weekly_matches,
+                                                                       match_probability_file=cli_args.match_probability_file,
+                                                                       base_log_dir=base_log_dir,
+                                                                       skip_done=cli_args.skip_done))
 
     # wait until finish
     ray.get(remote_ids)
