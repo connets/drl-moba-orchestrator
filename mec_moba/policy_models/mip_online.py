@@ -157,6 +157,8 @@ def compute_online_mip_solution(seed, match_probability_file=None,
         # print(seed, log_policy_name, 'has already done')
         return
 
+    print('mip-online', seed)
+
     T_SLOTS = evaluation_t_slot
     T = T_SLOTS + 6  # * 12
     F = 7

@@ -218,7 +218,7 @@ def run_comparison_main():
                                                                          base_log_dir=base_log_dir,
                                                                          max_look_ahead_scheduler=cli_args.mip_online_max_look_ahead_scheduler,
                                                                          cost_prediction=cli_args.mip_online_cost_prediction,
-                                                                         max_threads=4, skip_done=cli_args.skip_done))
+                                                                         max_threads=2, skip_done=cli_args.skip_done))
 
         if cli_args.best_fit:
             remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
