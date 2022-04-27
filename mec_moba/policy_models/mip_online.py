@@ -20,6 +20,7 @@ def solve_t_slot_mip_instance(current_t_slot,
                               delay_dict,
                               max_look_ahead_scheduler,
                               migrate_running: bool = False,
+                              cost_prediction: bool = False,
                               num_facilities=7, match_duration=6):
     N = len(new_matches)
     assignable_matches = [m.match_obj for m in new_matches]
@@ -35,9 +36,10 @@ def solve_t_slot_mip_instance(current_t_slot,
     for n in range(N):
         for f in range(F):
             for t in range(T):
+                cost_t_slot = current_t_slot + t if cost_prediction else current_t_slot
                 # t_slot instead of t because in the online version we don't know future costs,
                 # so we assume that costs do not change over time
-                rtt = max(delay_dict[current_t_slot, bs, f] for bs in assignable_matches[n].get_base_stations())
+                rtt = max(delay_dict[cost_t_slot, bs, f] for bs in assignable_matches[n].get_base_stations())
                 cost_c[n, f, t] = (5 - assignable_matches[n].compute_QoS(rtt)) / 5
 
     # scheduling costs only for new matches
@@ -147,6 +149,7 @@ def solve_t_slot_mip_instance(current_t_slot,
 def compute_online_mip_solution(seed, match_probability_file=None,
                                 evaluation_t_slot=144, n_games_per_epoch=6000,
                                 base_log_dir='logs', max_threads=0,
+                                cost_prediction=False,
                                 max_look_ahead_scheduler=6, skip_done=False):
     if skip_done and os.path.exists(f'{base_log_dir}/{seed}/mip_online'):
         return
@@ -182,6 +185,7 @@ def compute_online_mip_solution(seed, match_probability_file=None,
                                                               scheduled_matches=scheduled_matches,
                                                               running_matches=running_matches,
                                                               delay_dict=delay_dict,
+                                                              cost_prediction=cost_prediction,
                                                               max_look_ahead_scheduler=max_look_ahead_scheduler)
             for m in new_matches_scheduled:
                 for i, f in enumerate(m.facilities_list):

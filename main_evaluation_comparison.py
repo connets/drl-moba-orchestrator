@@ -55,13 +55,14 @@ def compute_optimal_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches
 @ray.remote
 def compute_online_mip_solution_wrapper(seed, evaluation_t_slot, num_weekly_matches,
                                         base_log_dir, match_probability_file, max_threads,
-                                        max_look_ahead_scheduler, skip_done):
+                                        max_look_ahead_scheduler, cost_prediction, skip_done):
     compute_online_mip_solution(seed=seed,
                                 evaluation_t_slot=evaluation_t_slot,
                                 base_log_dir=base_log_dir,
                                 n_games_per_epoch=num_weekly_matches,
                                 match_probability_file=match_probability_file,
                                 max_threads=max_threads,
+                                cost_prediction=cost_prediction,
                                 max_look_ahead_scheduler=max_look_ahead_scheduler,
                                 skip_done=skip_done)
 
@@ -175,6 +176,7 @@ def run_comparison_main():
     parser.add_argument('--match-probability-file', default=None)
     parser.add_argument('--num-weekly-matches', type=int, default=6000)
     parser.add_argument('--mip-online-max_look_ahead_scheduler', type=int, default=6, help="Number of look ahead time slots")
+    parser.add_argument('--mip-online-cost_prediction', action='store_true', help="whether or not assignment cost are 'predicted'")
     parser.add_argument('--skip-done', action='store_true')
     cli_args = parser.parse_args()
 
@@ -213,32 +215,32 @@ def run_comparison_main():
                                                                          match_probability_file=cli_args.match_probability_file,
                                                                          base_log_dir=base_log_dir,
                                                                          max_look_ahead_scheduler=cli_args.mip_online_max_look_ahead_scheduler,
+                                                                         cost_prediction=cli_args.mip_online_cost_prediction,
                                                                          max_threads=4, skip_done=cli_args.skip_done))
 
-        if cli_args.best_fit:
-            remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
-                                                                       num_weekly_matches=cli_args.num_weekly_matches,
-                                                                       match_probability_file=cli_args.match_probability_file,
-                                                                       base_log_dir=base_log_dir,
-                                                                       skip_done=cli_args.skip_done))
+            if cli_args.best_fit:
+                remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
+                                                                           num_weekly_matches=cli_args.num_weekly_matches,
+                                                                           match_probability_file=cli_args.match_probability_file,
+                                                                           base_log_dir=base_log_dir,
+                                                                           skip_done=cli_args.skip_done))
 
-    # wait until finish
-    ray.get(remote_ids)
-
-    max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
-
-    for seed_group in grouper(seeds, num_gurobi_processes):
-        # COMPUTE OPTIMAL SOLUTION
-        remote_ids = [compute_optimal_solution_wrapper.remote(seed,
-                                                              evaluation_t_slot=cli_args.test_t_slot,
-                                                              num_weekly_matches=cli_args.num_weekly_matches,
-                                                              match_probability_file=cli_args.match_probability_file,
-                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
-                                                              skip_done=cli_args.skip_done)
-                      for seed in seed_group if seed is not None]
         # wait until finish
         ray.get(remote_ids)
 
+        max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
 
-if __name__ == "__main__":
-    run_comparison_main()
+        for seed_group in grouper(seeds, num_gurobi_processes):
+            # COMPUTE OPTIMAL SOLUTION
+            remote_ids = [compute_optimal_solution_wrapper.remote(seed,
+                                                                  evaluation_t_slot=cli_args.test_t_slot,
+                                                                  num_weekly_matches=cli_args.num_weekly_matches,
+                                                                  match_probability_file=cli_args.match_probability_file,
+                                                                  base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
+                                                                  skip_done=cli_args.skip_done)
+                          for seed in seed_group if seed is not None]
+            # wait until finish
+            ray.get(remote_ids)
+
+    if __name__ == "__main__":
+        run_comparison_main()
