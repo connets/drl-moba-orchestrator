@@ -151,7 +151,9 @@ def compute_online_mip_solution(seed, match_probability_file=None,
                                 base_log_dir='logs', max_threads=0,
                                 cost_prediction=False,
                                 max_look_ahead_scheduler=6, skip_done=False):
-    if skip_done and os.path.exists(f'{base_log_dir}/{seed}/mip_online'):
+    log_policy_name = 'mip_online_cost_prediction' if cost_prediction else 'mip_online'
+
+    if skip_done and os.path.exists(f'{base_log_dir}/{seed}/{log_policy_name}'):
         return
 
     T_SLOTS = evaluation_t_slot
@@ -170,8 +172,8 @@ def compute_online_mip_solution(seed, match_probability_file=None,
     delay_dict = info_physical_net['delays']
 
     # log files
-    os.makedirs(f'{base_log_dir}/{SEED}/mip_online', exist_ok=True)
-    fd = open(f'{base_log_dir}/{SEED}/mip_online/match_data.csv', 'w', newline='')
+    os.makedirs(f'{base_log_dir}/{SEED}/{log_policy_name}', exist_ok=True)
+    fd = open(f'{base_log_dir}/{SEED}/{log_policy_name}/match_data.csv', 'w', newline='')
     match_data_log = csv.writer(fd)
     match_data_log.writerow(['t_slot', 'match_id', 'facility_id'])
 
