@@ -186,7 +186,7 @@ def run_comparison_main():
     ray.init(num_cpus=num_ray_processes)
 
 
-    print(cli_args)
+    #print(cli_args)
     evaluation_tag = f'eval-{cli_args.experiment_tag}-{cli_args.evaluation_tag}' if cli_args.evaluation_tag != '' else f'eval-{cli_args.experiment_tag}'
     base_log_dir = os.path.join('out_eval', evaluation_tag)
     os.makedirs(base_log_dir, exist_ok=True)
@@ -244,5 +244,6 @@ def run_comparison_main():
             # wait until finish
             ray.get(remote_ids)
 
-    if __name__ == "__main__":
-        run_comparison_main()
+
+if __name__ == "__main__":
+    run_comparison_main()

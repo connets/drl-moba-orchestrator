@@ -154,7 +154,7 @@ def compute_online_mip_solution(seed, match_probability_file=None,
     log_policy_name = 'mip_online_cost_prediction' if cost_prediction else 'mip_online'
 
     if skip_done and os.path.exists(f'{base_log_dir}/{seed}/{log_policy_name}'):
-        print(seed, log_policy_name, 'has already done')
+        # print(seed, log_policy_name, 'has already done')
         return
 
     T_SLOTS = evaluation_t_slot
