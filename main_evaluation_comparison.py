@@ -218,12 +218,12 @@ def run_comparison_main():
                                                                          cost_prediction=cli_args.mip_online_cost_prediction,
                                                                          max_threads=4, skip_done=cli_args.skip_done))
 
-            if cli_args.best_fit:
-                remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
-                                                                           num_weekly_matches=cli_args.num_weekly_matches,
-                                                                           match_probability_file=cli_args.match_probability_file,
-                                                                           base_log_dir=base_log_dir,
-                                                                           skip_done=cli_args.skip_done))
+        if cli_args.best_fit:
+            remote_ids.append(compute_best_fit_solution_wrapper.remote(seed, evaluation_t_slot=cli_args.test_t_slot,
+                                                                       num_weekly_matches=cli_args.num_weekly_matches,
+                                                                       match_probability_file=cli_args.match_probability_file,
+                                                                       base_log_dir=base_log_dir,
+                                                                       skip_done=cli_args.skip_done))
 
         # wait until finish
         ray.get(remote_ids)
