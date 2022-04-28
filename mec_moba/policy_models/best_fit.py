@@ -1,12 +1,10 @@
 import os
 
 import numpy as np
-from typing import List, Tuple
+from typing import Tuple
 
 from mec_moba.environment.utils.delay_exctractor import *
-import gurobipy as gp
 import csv
-from collections import namedtuple
 
 from mec_moba.environment.matches import GameGenerator, Game
 
@@ -18,16 +16,21 @@ def compute_assignment_cost(game, delay_dict, t, f):
     return (5 - game.compute_QoS(rtt)) / 5
 
 
-def schedule_game_best_fit(game: Game, request_t_slot, facility_occupation_mat, delay_dict, max_facility_capacity) -> Tuple[int, int]:
+def compute_object_function(game, delay_dict, request_t, sched_t, f, facility_occupation_mat, op_limit=8):
+    overprovisioning_cost = sum(map(lambda occ: max(occ - op_limit, 0), facility_occupation_mat[f, sched_t: sched_t + game.get_duration()]))
+    assignment_cost = compute_assignment_cost(game, delay_dict, request_t, f)
+    return assignment_cost + overprovisioning_cost
+
+
+def schedule_game_best_fit(game: Game, request_t_slot, facility_occupation_mat, delay_dict, max_facility_capacity, ) -> Tuple[int, int]:
     # assignment costs are available only for request t_slot and we assume no prediction,
     # so the costs for future t_slot are the same
     scheduling_t_slot = request_t_slot
     num_facilities = facility_occupation_mat.shape[0]
     scheduled = False
 
-    sorted_facilities = sorted(range(num_facilities), key=lambda f: compute_assignment_cost(game, delay_dict, request_t_slot, f))
-
     while not scheduled:
+        sorted_facilities = sorted(range(num_facilities), key=lambda f: compute_object_function(game, delay_dict, request_t_slot, scheduling_t_slot, f, facility_occupation_mat))
         for f in sorted_facilities:
             # check if there is sufficient capacity for all the game duration
             potential_slots = facility_occupation_mat[f, scheduling_t_slot:scheduling_t_slot + game.get_duration()]
