@@ -227,22 +227,22 @@ def run_comparison_main():
                                                                        base_log_dir=base_log_dir,
                                                                        skip_done=cli_args.skip_done))
 
+    # wait until finish
+    ray.get(remote_ids)
+
+    max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
+
+    for seed_group in grouper(seeds, num_gurobi_processes):
+        # COMPUTE OPTIMAL SOLUTION
+        remote_ids = [compute_optimal_solution_wrapper.remote(seed,
+                                                              evaluation_t_slot=cli_args.test_t_slot,
+                                                              num_weekly_matches=cli_args.num_weekly_matches,
+                                                              match_probability_file=cli_args.match_probability_file,
+                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
+                                                              skip_done=cli_args.skip_done)
+                      for seed in seed_group if seed is not None]
         # wait until finish
         ray.get(remote_ids)
-
-        max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
-
-        for seed_group in grouper(seeds, num_gurobi_processes):
-            # COMPUTE OPTIMAL SOLUTION
-            remote_ids = [compute_optimal_solution_wrapper.remote(seed,
-                                                                  evaluation_t_slot=cli_args.test_t_slot,
-                                                                  num_weekly_matches=cli_args.num_weekly_matches,
-                                                                  match_probability_file=cli_args.match_probability_file,
-                                                                  base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
-                                                                  skip_done=cli_args.skip_done)
-                          for seed in seed_group if seed is not None]
-            # wait until finish
-            ray.get(remote_ids)
 
 
 if __name__ == "__main__":
