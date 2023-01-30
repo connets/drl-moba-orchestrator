@@ -8,12 +8,10 @@ from multiprocessing import Pool
 
 from gym.wrappers import FlattenObservation
 from mec_moba.envs.utils.rewardComponentsLoggerWrapper import RewardComponentLogger
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from collections import namedtuple
 import itertools
 
-import torch, math, numpy as np
-from torch import nn
+import torch, math
 import tianshou as ts
 
 from torch.utils.tensorboard import SummaryWriter

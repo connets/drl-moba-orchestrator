@@ -1,6 +1,3 @@
-import os
-from time import time
-
 import argparse
 
 # This is a sample Python script.
