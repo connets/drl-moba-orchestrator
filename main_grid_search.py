@@ -7,6 +7,7 @@ import yaml
 from multiprocessing import Pool
 
 from gym.wrappers import FlattenObservation
+from mec_moba.envs.utils.rewardComponentsLoggerWrapper import RewardComponentLogger
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from collections import namedtuple
 import itertools
@@ -101,7 +102,11 @@ class Experiment:
         tb_log_dir = os.path.join(run_params.base_dir, 'dqn_mec_moba_tensorboard')
 
         train_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights,
-                                  match_probability_file=run_params.match_prob_file)
+                                  match_probability_file=run_params.match_prob_file,
+                                  return_reward_components=True)
+        train_env = RewardComponentLogger(train_env,
+                                          logfile=os.path.join(run_params.base_dir, run_params.run_id,'train_reward_log.csv'),
+                                          compressed=True)
         train_env = FlattenObservation(train_env)
 
         test_env = MecMobaDQNEvn(reward_weights=run_params.reward_weights)

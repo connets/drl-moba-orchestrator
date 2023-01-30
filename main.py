@@ -9,15 +9,13 @@ import argparse
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import progressbar
 from gym.wrappers import FlattenObservation
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3 import DQN, PPO
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
-
 from mec_moba.envs import MecMobaDQNEvn
 
 import torch, math, numpy as np
 from torch import nn
 import tianshou as ts
+
+from mec_moba.envs.utils.rewardComponentsLoggerWrapper import RewardComponentLogger
 
 
 class Net(nn.Module):
@@ -57,13 +55,16 @@ def parse_cli_args():
 
 
 def main(cli_args):
+    logdir = 'logs/dqn-test'
     # log_dir = "./tmp/gym/{}".format(int(time()))
     # os.makedirs(log_dir, exist_ok=True)
 
-    env = MecMobaDQNEvn(reward_weights=(0.25, 0.5, 1))
+    env = MecMobaDQNEvn(reward_weights=(0.25, 0.5, 1),return_reward_components=True)
+    env = RewardComponentLogger(env, logfile=f'{logdir}/rw_components.csv', compressed=True)
     env = FlattenObservation(env)
 
     test_env = MecMobaDQNEvn(reward_weights=(0.25, 0.5, 1))
+    #test_env = RewardComponentLogger(test_env, logfile=f'{logdir}/test_rw_components.csv')
     test_env = FlattenObservation(test_env)
     # check_env(env, warn=True)
 
@@ -85,7 +86,7 @@ def main(cli_args):
 
     from torch.utils.tensorboard import SummaryWriter
     from tianshou.utils import TensorboardLogger
-    logdir = 'logs/dqn-test'
+
     writer = SummaryWriter(logdir)
     logger = TensorboardLogger(writer)
 
@@ -120,46 +121,8 @@ def main(cli_args):
             # back to training eps
             policy.set_eps(0.1)
 
-        # train policy with a sampled batch data from buffer
-
-    # result = ts.trainer.offpolicy_trainer(
-    #     policy, train_collector, test_collector,
-    #     max_epoch=30, step_per_epoch=1008 * 52, step_per_collect=4,
-    #     update_per_step=1, episode_per_test=10, batch_size=32,
-    #     train_fn=lambda epoch, env_step: policy.set_eps(0.1),
-    #     test_fn=lambda epoch, env_step: policy.set_eps(0),
-    #     stop_fn=lambda mean_rewards: mean_rewards >= 0,
-    #     save_fn=save_policy_fn, test_in_train=False,
-    #     logger=logger)
-    # print(f'Finished training! Use {result["duration"]}')
-
-    # model = DDQN('MlpPolicy', env,
-    #              verbose=1,
-    #              learning_starts=100,
-    #              buffer_size=100_000,
-    #              target_update_interval=2000,
-    #              #tau=0.001,
-    #              exploration_fraction=0.2,
-    #              exploration_final_eps=0.02,
-    #              batch_size=64,
-    #              # policy_kwargs={'net_arch': [64,64,64]},
-    #              tensorboard_log="./tb_log/dqn_mec_moba_tensorboard/")
-
-    # model = PPO('MlpPolicy', env, verbose=1, n_steps=500, batch_size=50,
-    #             vf_coef=0.5, ent_coef=0.01, tensorboard_log="./tb_log/ppo_mec_moba_tensorboard/")
-
-    # obs = env.reset()
-    # for i in range(1000):
-    #     action, _state = model.predict(obs, deterministic=True)
-    #     print(action)
-    #     obs, reward, done, info = env.step(action)
-    #     env.render()
-    #     if done:
-    #         obs = env.reset()
-
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main(cli_args=parse_cli_args())
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/

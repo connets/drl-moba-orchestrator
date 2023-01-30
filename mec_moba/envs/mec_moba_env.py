@@ -2,7 +2,6 @@ import logging
 from typing import Optional
 
 import gym
-import numpy as np
 from gym.spaces import Box, Discrete
 import itertools
 
@@ -26,7 +25,7 @@ class MecMobaDQNEvn(gym.Env):
 
     def __init__(self, reward_weights=None,
                  gen_requests_until=None, match_probability_file=None, n_games_per_epoch: Optional[int] = None,
-                 log_match_data=False, base_log_dir=None):
+                 log_match_data=False, base_log_dir=None, return_reward_components=False):
         super(MecMobaDQNEvn, self).__init__()
         if reward_weights is None:
             reward_weights = Environment.default_reward_weights()
@@ -47,6 +46,8 @@ class MecMobaDQNEvn(gym.Env):
         self._log_match_data = log_match_data
         self._base_log_dir = base_log_dir
         assert not log_match_data or (log_match_data and base_log_dir is not None)
+
+        self._return_reward_components = return_reward_components
 
     def action_id_to_human(self, action):
         return self._actions_dict[action]
@@ -70,8 +71,14 @@ class MecMobaDQNEvn(gym.Env):
         self._generate_and_enqueue_requests()
 
         observation = self._internal_env.get_time_slot_state().to_array()
-        reward, _ = self._internal_env.compute_reward(action_, action_result)
+        reward, rw_components, rw_components_norm = self._internal_env.compute_reward(action_, action_result)
+
+        if self._return_reward_components:
+            return observation, reward, week_end, {'rw_components': rw_components,
+                                                   'rw_components_norm': rw_components_norm}
+
         return observation, reward, week_end, {}
+
         #
 
     def reset(self):
