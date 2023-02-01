@@ -11,6 +11,7 @@ import pandas as pd
 from gym.wrappers import FlattenObservation
 
 from mec_moba.envs import MecMobaDQNEvn
+from mec_moba.envs.utils.executionTimeLoggerWrapper import TimeLoggerWrapper
 from mec_moba.envs.utils.stepLoggerWrapper import StepLogger
 from optimal_main import compute_optimal_solution
 from mec_moba.policy_models.mip_online import compute_online_mip_solution
@@ -95,6 +96,7 @@ def run_test(seed, agent: TestAgent, reward_weights, match_probability_file, bas
                         base_log_dir=base_log_dir)
     # env = Monitor(env)
     env = StepLogger(env, logfile=f'{base_log_dir}/eval_test_{agent.policy_type()}.csv')
+    env = TimeLoggerWrapper(env, logfile=f'{base_log_dir}/time_log.csv' )
     env = FlattenObservation(env)
     env.seed(seed)
 
@@ -141,17 +143,17 @@ def evaluate_dqn_policies_and_random(seed, experiment_tag, evaluation_t_slot, ba
 
         # RANDOM
     # for run_id, rnd_run in progressbar.progressbar(list(itertools.product(unique_run_ids, range(repeat))), prefix='Random policy '):
-    if eval_random_policy:
-        print('Random policy evaluation')
-        for run_id, rnd_run in itertools.product(unique_run_ids, range(rnd_repeat)):
-            remote_ids.append(run_test.remote(seed=seed,
-                                              agent=RandomAgent(),
-                                              t_slot_to_test=evaluation_t_slot + 6 * 5,
-                                              reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
-                                              match_probability_file=match_probability_file,
-                                              gen_requests_until=evaluation_t_slot,
-                                              base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}"),
-                                              skip_done=skip_done))
+    # if eval_random_policy:
+    #     print('Random policy evaluation')
+    #     for run_id, rnd_run in itertools.product(unique_run_ids, range(rnd_repeat)):
+    #         remote_ids.append(run_test.remote(seed=seed,
+    #                                           agent=RandomAgent(),
+    #                                           t_slot_to_test=evaluation_t_slot + 6 * 5,
+    #                                           reward_weights=get_reward_weights_from_run_id(run_id, experiment_tag),
+    #                                           match_probability_file=match_probability_file,
+    #                                           gen_requests_until=evaluation_t_slot,
+    #                                           base_log_dir=os.path.join(base_log_dir, str(seed), 'rnd', f"{run_id}_{rnd_run}"),
+    #                                           skip_done=skip_done))
     return remote_ids
 
 
@@ -170,9 +172,11 @@ def run_comparison_main():
     parser.add_argument('-g', type=int, default=4, help='Number of parallel gurobi processes', dest='num_gurobi_processes')
     parser.add_argument('--test-t-slot', type=int, default=144, help="Number of testing time slots")
     parser.add_argument('--seeds-file', default=None)
+    parser.add_argument('--rl-policy', action='store_true', help='Enable evaluation using RL policy')
     parser.add_argument('--random-policy', action='store_true')
-    parser.add_argument('--mip-online', action='store_true')
-    parser.add_argument('--best-fit', action='store_true')
+    parser.add_argument('--mip-online', action='store_true', help='Enable evaluation using MIP-ONLINE policy')
+    parser.add_argument('--best-fit', action='store_true', help='Enable evaluation using BEST-FIT policy')
+    parser.add_argument('--optimal', action='store_true', help='Compute optimal (offline)')
     parser.add_argument('--match-probability-file', default=None)
     parser.add_argument('--num-weekly-matches', type=int, default=6000)
     parser.add_argument('--mip-online-max_look_ahead_scheduler', type=int, default=6, help="Number of look ahead time slots")
@@ -200,15 +204,16 @@ def run_comparison_main():
     remote_ids = []
     for seed in seeds:
         # EVALUATE POLICIES SOLUTION and EVALUATE RANDOM SOLUTION
-        remote_ids.extend(evaluate_dqn_policies_and_random(seed,
-                                                           experiment_tag=cli_args.experiment_tag,
-                                                           evaluation_t_slot=cli_args.test_t_slot,
-                                                           base_log_dir=base_log_dir,
-                                                           num_weekly_matches=cli_args.num_weekly_matches,
-                                                           match_probability_file=cli_args.match_probability_file,
-                                                           rnd_repeat=cli_args.rnd_repeats,
-                                                           eval_random_policy=cli_args.random_policy,
-                                                           skip_done=cli_args.skip_done))
+        if cli_args.rl_policy:
+            remote_ids.extend(evaluate_dqn_policies_and_random(seed,
+                                                               experiment_tag=cli_args.experiment_tag,
+                                                               evaluation_t_slot=cli_args.test_t_slot,
+                                                               base_log_dir=base_log_dir,
+                                                               num_weekly_matches=cli_args.num_weekly_matches,
+                                                               match_probability_file=cli_args.match_probability_file,
+                                                               rnd_repeat=cli_args.rnd_repeats,
+                                                               eval_random_policy=cli_args.random_policy,
+                                                               skip_done=cli_args.skip_done))
         # EVALUATE MIP ONLINE
         if cli_args.mip_online:
             remote_ids.append(compute_online_mip_solution_wrapper.remote(seed,
@@ -232,17 +237,18 @@ def run_comparison_main():
 
     max_gurobi_threads = int(num_ray_processes / num_gurobi_processes)
 
-    for seed_group in grouper(seeds, num_gurobi_processes):
-        # COMPUTE OPTIMAL SOLUTION
-        remote_ids = [compute_optimal_solution_wrapper.remote(seed,
-                                                              evaluation_t_slot=cli_args.test_t_slot,
-                                                              num_weekly_matches=cli_args.num_weekly_matches,
-                                                              match_probability_file=cli_args.match_probability_file,
-                                                              base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
-                                                              skip_done=cli_args.skip_done)
-                      for seed in seed_group if seed is not None]
-        # wait until finish
-        ray.get(remote_ids)
+    if cli_args.optimal:
+        for seed_group in grouper(seeds, num_gurobi_processes):
+            # COMPUTE OPTIMAL SOLUTION
+            remote_ids = [compute_optimal_solution_wrapper.remote(seed,
+                                                                  evaluation_t_slot=cli_args.test_t_slot,
+                                                                  num_weekly_matches=cli_args.num_weekly_matches,
+                                                                  match_probability_file=cli_args.match_probability_file,
+                                                                  base_log_dir=base_log_dir, max_threads=max_gurobi_threads,
+                                                                  skip_done=cli_args.skip_done)
+                          for seed in seed_group if seed is not None]
+            # wait until finish
+            ray.get(remote_ids)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import itertools
 import os
+import time
 
 import numpy as np
 from typing import Tuple
@@ -18,7 +19,8 @@ def compute_assignment_cost(game, delay_dict, t, f):
 
 
 def compute_object_function(game, delay_dict, request_t, sched_t, f, facility_occupation_mat, op_limit=8):
-    overprovisioning_cost = sum(map(lambda occ: max(occ - op_limit, 0), facility_occupation_mat[f, sched_t: sched_t + game.get_duration()]))
+    overprovisioning_cost = sum(
+        map(lambda occ: max(occ - op_limit, 0), facility_occupation_mat[f, sched_t: sched_t + game.get_duration()]))
     assignment_cost = compute_assignment_cost(game, delay_dict, request_t, f)
     scheduling_cost = sched_t - request_t
     return assignment_cost + overprovisioning_cost + scheduling_cost
@@ -38,7 +40,8 @@ def schedule_game_best_fit(game: Game,
 
     while not scheduled:
         sorted_potential_solutions = itertools.product(range(num_facilities),
-                                                       range(scheduling_t_slot, scheduling_t_slot + max_look_ahead_scheduler))
+                                                       range(scheduling_t_slot,
+                                                             scheduling_t_slot + max_look_ahead_scheduler))
         sorted_potential_solutions = sorted(sorted_potential_solutions,
                                             key=lambda e: compute_object_function(game,
                                                                                   delay_dict,
@@ -82,14 +85,19 @@ def compute_best_fit_solution(seed, match_probability_file=None,
     match_data_log = csv.writer(fd)
     match_data_log.writerow(['t_slot', 'match_id', 'facility_id'])
 
+    fd_timelog = open(f'{base_log_dir}/{seed}/{log_policy_name}/time_log.csv', 'w', newline='')
+    fd_timelog.write('excution_time\n')
+
     for t in range(evaluation_t_slot):
         t_slot_game_requests = game_generator.get_match_requests(t)
         for g in t_slot_game_requests:
+            s_time = time.time()
             facility, sched_t_slot = schedule_game_best_fit(g, request_t_slot=t,
                                                             facility_occupation_mat=facility_occupation_mat,
                                                             delay_dict=delay_dict,
                                                             max_facility_capacity=max_facility_capacity,
                                                             max_look_ahead_scheduler=max_look_ahead_scheduler)
+            fd_timelog.write(f'{time.time() - s_time}\n')
 
             # LOG
             for g_t in range(g.get_duration()):

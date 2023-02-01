@@ -1,4 +1,5 @@
 import os
+import time
 from typing import List
 
 import numpy as np
@@ -180,11 +181,15 @@ def compute_online_mip_solution(seed, match_probability_file=None,
     match_data_log = csv.writer(fd)
     match_data_log.writerow(['t_slot', 'match_id', 'facility_id'])
 
+    fd_timelog = open(f'{base_log_dir}/{SEED}/{log_policy_name}/time_log.csv', 'w', newline='')
+    fd_timelog.write('excution_time\n')
+
     scheduled_matches: List[ScheduledMatches] = list()
     running_matches: List[RunningMatches] = list()
     for t in range(T):
         if t < T_SLOTS:
             new_match_requests = [NewMatches(g.id, g) for g in game_generator.get_match_requests(t)]
+            s_time = time.time()
             new_matches_scheduled = solve_t_slot_mip_instance(current_t_slot=t,
                                                               new_matches=new_match_requests,
                                                               scheduled_matches=scheduled_matches,
@@ -192,6 +197,8 @@ def compute_online_mip_solution(seed, match_probability_file=None,
                                                               delay_dict=delay_dict,
                                                               cost_prediction=cost_prediction,
                                                               max_look_ahead_scheduler=max_look_ahead_scheduler)
+            fd_timelog.write(f'{time.time() - s_time}\n')
+
             for m in new_matches_scheduled:
                 for i, f in enumerate(m.facilities_list):
                     match_data_log.writerow([m.scheduled_t_slot + i, m.match_id, f])

@@ -84,7 +84,7 @@ class MecMobaDQNEvn(gym.Env):
     def reset(self):
         self._internal_env.reset()
         self._generate_and_enqueue_requests()
-        return self._initial_observation()
+        return self._initial_observation() #, {}
 
     def get_current_observation(self):
         return self._internal_env.get_time_slot_state().to_array()
