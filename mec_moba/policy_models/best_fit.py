@@ -56,7 +56,7 @@ def schedule_game_best_fit(game: Game,
             if all(potential_slots):
                 return f, t
 
-        print('Solution not found! go next!')
+        #print('Solution not found! go next!')
         scheduling_t_slot += max_look_ahead_scheduler  # try in the next time-slot
 
     raise Exception('No assignment is possible')
