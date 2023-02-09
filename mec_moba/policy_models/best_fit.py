@@ -90,14 +90,14 @@ def compute_best_fit_solution(seed, match_probability_file=None,
 
     for t in range(evaluation_t_slot):
         t_slot_game_requests = game_generator.get_match_requests(t)
+        s_time = time.time()
         for g in t_slot_game_requests:
-            s_time = time.time()
+
             facility, sched_t_slot = schedule_game_best_fit(g, request_t_slot=t,
                                                             facility_occupation_mat=facility_occupation_mat,
                                                             delay_dict=delay_dict,
                                                             max_facility_capacity=max_facility_capacity,
                                                             max_look_ahead_scheduler=max_look_ahead_scheduler)
-            fd_timelog.write(f'{time.time() - s_time}\n')
 
             # LOG
             for g_t in range(g.get_duration()):
@@ -105,3 +105,5 @@ def compute_best_fit_solution(seed, match_probability_file=None,
             # UPDATE OCCUPATION
             for ut in range(sched_t_slot, sched_t_slot + g.get_duration()):
                 facility_occupation_mat[facility, ut] += 1
+
+        fd_timelog.write(f'{time.time() - s_time}\n')
