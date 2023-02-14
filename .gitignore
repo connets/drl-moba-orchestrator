@@ -166,6 +166,9 @@ r.py
 
 # IntelliJ
 /out/
+/out-*/
+/out_*/
+simulation_configs/*.yaml
 
 # mpeltonen/sbt-idea plugin
 .idea_modules/

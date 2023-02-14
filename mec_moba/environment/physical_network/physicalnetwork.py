@@ -19,14 +19,12 @@ class PhysicalNetwork:
     def __init__(self, environment: Environment):
         self.environment = environment
         self.mec_op = 0
-        if not os.path.isfile('data/delay_dict.pkl'):
-            extract_delay()
-        info_physical_net = pickle.load(open('data/delay_dict.pkl', 'rb'))
+        info_physical_net = extract_delay()
         self.delay_dict = info_physical_net['delays']
 
         self.n_bs, self.n_mec = info_physical_net['n_bs'], info_physical_net['n_mec']
-        facility_capacity = 10  # get_config_value(PhysicalNetwork.get_module_config_name(), FACILITY_CAPACITY_PARAM)
-        self._mec_facilities = {int(m): MecFacility(int(m), facility_capacity) for m in range(self.n_mec)}
+        # facility_capacity = 10  # get_config_value(PhysicalNetwork.get_module_config_name(), FACILITY_CAPACITY_PARAM)
+        self._mec_facilities = {int(m): MecFacility(int(m)) for m in range(self.n_mec)}  # TODO read facility capacity from config
 
     def change_epoch(self):
         for facility in self._mec_facilities.values():
@@ -44,6 +42,9 @@ class PhysicalNetwork:
     def get_mec_capacities(self):
         return [facility.capacity for facility in self._mec_facilities.values()]
 
+    def get_mec_max_capacities(self):
+        return [facility.max_capacity for facility in self._mec_facilities.values()]
+
     def deploy(self, match, facility_id):
         self._mec_facilities[facility_id].deploy(match)
 
@@ -55,7 +56,7 @@ class PhysicalNetwork:
         self._mec_facilities[facility_id].undeploy(match)
 
     def get_rtt(self, bs, mec):
-        return self.delay_dict[(self.environment.epoch_t_slot, bs, mec)] * 1.5
+        return self.delay_dict[(self.environment.epoch_t_slot, bs, mec)]
 
     def get_all_facilities_occupation(self, normalized):
         return [facility.get_facility_occupation(normalized=normalized) for facility in self._mec_facilities.values()]

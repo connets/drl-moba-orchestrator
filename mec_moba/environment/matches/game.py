@@ -11,7 +11,7 @@ class Game(object):
     _qos_levels = {NORMAL_TYPE: [(5, 0), (10, 1), (15, 2), (20, 3), (25, 4), (math.inf, 5)],
                    PREMIUM_TYPE: [(10, 0), (20, 1), (30, 2), (40, 3), (50, 4), (math.inf, 5)]}
 
-    game_id = itertools.count(0)
+    #game_id = itertools.count(0)
 
     def __init__(self, game_id, duration, resources_cost, group: list, max_wait, queue_abandon_time=-1, game_type=NORMAL_TYPE):
         # identificativo unico
@@ -115,10 +115,11 @@ class Game(object):
     #     self.QoS = self.compute_QoS(rtt)
 
     def compute_QoS(self, rtt_ms):
-        fps = round(1000 / rtt_ms)
-        fps_qos = Game._qos_levels[self.game_type]
-        qos = next(itertools.dropwhile(lambda e: e[0] < fps, fps_qos))[1]
-        return qos
+        return 5 - min(int(rtt_ms / 10), 5)
+        # fps = round(1000 / rtt_ms)
+        # fps_qos = Game._qos_levels[self.game_type]
+        # qos = next(itertools.dropwhile(lambda e: e[0] < fps, fps_qos))[1]
+        # return qos
 
     @staticmethod
     def get_num_qos_level():
@@ -132,3 +133,7 @@ class Game(object):
 
     def __repr__(self):
         return f'{self.game_id} BSs: {self.group}'
+
+    def to_dict(self):
+        return {'id': self.game_id,
+                'bs_list': self.get_base_stations()}

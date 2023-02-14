@@ -3,7 +3,7 @@ from __future__ import annotations
 # non prendiamo il caso che un utente giochi nello stesso timeslot
 import collections
 import json
-from typing import List
+from typing import List, Optional
 
 from mec_moba.environment.utils.probability_extractor import *
 from mec_moba.environment.utils.user_home_extractor import *
@@ -17,9 +17,9 @@ QUEUE_EXIT_TIME_PARAM = 'queue_exit_time'
 MATCH_RESOURCE_PARAM = 'resource'
 NUM_USER_MATCH = 'num_user_match'
 
-defaults = {MAX_WAITING_TIME_PARAM: 3,
-            NUM_GAMES_PER_EPOCH_PARAM: 5000,
-            MAX_DURATION_PARAM: 10,
+defaults = {MAX_WAITING_TIME_PARAM: 0,
+            NUM_GAMES_PER_EPOCH_PARAM: 6000,  # 6000,
+            MAX_DURATION_PARAM: 6,  # 6,
             QUEUE_EXIT_TIME_PARAM: None,
             MATCH_RESOURCE_PARAM: 1,
             NUM_USER_MATCH: 4
@@ -38,12 +38,13 @@ class GameGenerator:
     #             ConfigOption(name=NUM_USER_MATCH, default_value=4, help_string='Number of user per match')
     #             ]
 
-    def __init__(self, no_overlapping=False):
+    def __init__(self, gen_requests_until=None, no_overlapping=False,
+                 match_probability_file=None, n_games_per_epoch: Optional[int] = None):
         # distribuzione durata di una partita (la durata è in timeslots)
         self.duration = defaults[MAX_DURATION_PARAM]
         self.max_wait = defaults[MAX_WAITING_TIME_PARAM]
         self.exit_time = defaults[QUEUE_EXIT_TIME_PARAM]
-        self.n_games_per_epoch = defaults[NUM_GAMES_PER_EPOCH_PARAM]
+        self.n_games_per_epoch = defaults[NUM_GAMES_PER_EPOCH_PARAM] if n_games_per_epoch is None else n_games_per_epoch
 
         # numero di utenti per partita/servizio
         self.n_users = defaults[NUM_USER_MATCH]
@@ -58,12 +59,13 @@ class GameGenerator:
 
         self.history = dict()
 
+        self.gen_requests_until = gen_requests_until
         # check se un giocatore sta già giocando una aprtita
         # e quindi evita che si crei un'altra partita
         self.no_overlapping = no_overlapping
 
         # probabilità di giocare per ogni timeslot da testare per ogni gruppo
-        self.probability_to_play = extract_game_requests_probability()
+        self.probability_to_play = extract_game_requests_probability(fname=match_probability_file)
 
         # ottengo il dizionario con le bs e tutti gli utenti sotot a ciascuna
         self.users_bss = extract_users()
@@ -101,10 +103,13 @@ class GameGenerator:
                     queue_abandon_time=self.exit_time)
 
     def get_match_requests(self, t_slot) -> List[Game]:
+        if self.gen_requests_until is not None and t_slot >= self.gen_requests_until:
+            return []
         # if t_slot key is not in the dictionary it means zero matches!!
         x = list(self.history.get(t_slot, []))
         self.epoch_games_generated += len(x)
         # print('Game generated ', t_slot, self.epoch_games_generated)
+
         return x
 
     def check_overlapping(self, l) -> bool:

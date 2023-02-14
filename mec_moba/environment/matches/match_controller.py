@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from heapq import *
 from typing import Iterable, List
+import math
 
 import mec_moba.environment.utils.utils as utils
 
@@ -47,11 +48,11 @@ class MatchController:
                 # >= perchè in casi di sovraffollamento di una mec e le altre vuote potrebbe aver senso migrare
                 # per distribuire il peso
                 if min([match.compute_QoS(self.physical_net_ctl.get_rtt(bs, j)) for bs in
-                        match.get_base_stations()]) >= current_qos and j != match.get_facility_id():
+                        match.get_base_stations()]) > current_qos and j != match.get_facility_id():
                     migrable_vnf.append(match)
                     break
 
-        to_ret = nsmallest(round(len(migrable_vnf) * d / 100), migrable_vnf, key=lambda v: v.get_QoS())
+        to_ret = nsmallest(math.ceil(len(migrable_vnf) * d / 100), migrable_vnf, key=lambda v: v.get_QoS())
 
         return to_ret, [i for i in self.running if i not in to_ret]
 
@@ -64,7 +65,7 @@ class MatchController:
     # manda la lista delle partite da deployare
     def get_deploy_list(self, deploy_value):
         current_t_slot = self.environment.absolute_t_slot
-        return nsmallest(round(len(self.queue) * deploy_value / 100),
+        return nsmallest(math.ceil(len(self.queue) * deploy_value / 100),
                          self.queue, key=lambda match: - match.get_queue_waiting_time(current_t_slot))
 
     def deploy(self, match, facility_id):
@@ -119,7 +120,7 @@ class MatchController:
             else:
                 dropped_match_requests += 1
 
-        #assert all(map(lambda m: m in self.queue, match_requests))
+        # assert all(map(lambda m: m in self.queue, match_requests))
 
         self.drop_ratio = dropped_match_requests / len(match_requests) if len(match_requests) > 0 else 0
 
@@ -136,6 +137,12 @@ class MatchController:
 
         return list(map(lambda a: a / len(self.running), tmp_qos))
 
+    def get_mean_qos_running_instances(self) -> float:
+        if len(self.running) == 0:
+            return -1
+
+        return sum([5 - m.get_QoS() for m in self.running]) / len(self.running)
+
     def get_mean_running_time_state(self) -> float:
         current_t_slot = self.environment.absolute_t_slot
         return sum([r.get_time_running(current_t_slot) / r.get_duration() for r in self.running]) / len(self.running) if len(self.running) > 0 else 0
@@ -145,7 +152,9 @@ class MatchController:
 
     def get_mean_queue_waiting_time(self):
         current_t_slot = self.environment.absolute_t_slot
-        return sum(map(lambda e: min(4, utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue), ) / len(self.queue) if len(self.queue) > 0 else 0
+        #ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], utils.exp_lin(e.get_queue_waiting_time(current_t_slot) - e.get_max_wait())), self.queue)
+        ret_value = map(lambda e: min(defaults[MAX_WAITING_TIME_VALUE_PARAM], e.get_queue_waiting_time(current_t_slot)), self.queue)
+        return sum(ret_value) / len(self.queue) / defaults[MAX_WAITING_TIME_VALUE_PARAM] if len(self.queue) > 0 else 0
 
     def get_queue_drop_rate(self):
         return self.drop_ratio
